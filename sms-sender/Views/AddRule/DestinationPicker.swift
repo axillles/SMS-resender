@@ -52,9 +52,9 @@ struct DestinationPicker: View {
                             title: "API"
                         ) {
                             selectedDestination = .api
-                        }
-                    }
-                }
+            }
+        }
+    }
                 .padding()
             }
         }
@@ -71,7 +71,7 @@ struct DestinationButton: View {
     let icon: String
     let title: String
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
@@ -90,8 +90,8 @@ struct DestinationButton: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.black, lineWidth: 1)
             )
-        }
     }
+}
 }
 
 #Preview {
