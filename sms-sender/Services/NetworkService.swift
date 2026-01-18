@@ -187,6 +187,10 @@ class NetworkService {
         
         if response.isSuccess {
             logger.info("✅ OTP sent successfully: \(response.message)")
+            if let otpCode = response.otpCode {
+                logger.info("🔑 OTP code received from server: \(otpCode)")
+                logger.warning("⚠️ Note: OTP code in response is for development/testing. In production, OTP should be sent via SMS only.")
+            }
         } else {
             logger.error("❌ Failed to send OTP: \(response.message)")
             throw NetworkError.apiError(message: response.message)
@@ -249,6 +253,73 @@ class NetworkService {
         } else {
             logger.error("❌ Failed to delete phone: \(response.message)")
             throw NetworkError.apiError(message: response.message)
+        }
+        
+        return response
+    }
+    
+    // MARK: - Save URL (Slack/API Webhook)
+    func saveURL(registrationId: String, url: String, isSlack: Bool, delete: Bool = false) async throws -> WebhookResponse {
+        logger.info("🔗 Saving webhook: \(url), isSlack: \(isSlack), delete: \(delete)")
+        guard let apiURL = APIConstants.saveURLURL else {
+            logger.error("❌ Invalid save URL endpoint")
+            throw NetworkError.invalidURL
+        }
+        
+        let request = WebhookRequest(
+            registrationId: registrationId,
+            url: url,
+            isSlack: isSlack,
+            delete: delete
+        )
+        
+        let response = try await performRequest(
+            url: apiURL,
+            body: request,
+            responseType: WebhookResponse.self
+        )
+        
+        if response.isSuccess {
+            logger.info("✅ Webhook saved successfully: \(response.message)")
+        } else {
+            logger.error("❌ Failed to save webhook: \(response.message)")
+            throw NetworkError.apiError(message: response.message)
+        }
+        
+        return response
+    }
+    
+    // MARK: - Forward Message
+    func forward(registrationId: String, message: String, sender: String, timestamp: Date, subject: String? = nil) async throws -> ForwardResponse {
+        logger.info("📨 Forwarding message from: \(sender)")
+        guard let url = APIConstants.forwardURL else {
+            logger.error("❌ Invalid forward URL")
+            throw NetworkError.invalidURL
+        }
+        
+        let request = ForwardRequest(
+            registrationId: registrationId,
+            message: message,
+            sender: sender,
+            timestamp: timestamp,
+            subject: subject
+        )
+        
+        let response = try await performRequest(
+            url: url,
+            body: request,
+            responseType: ForwardResponse.self
+        )
+        
+        if response.isSuccess {
+            if let details = response.details {
+                logger.info("✅ Message forwarded successfully. Sent: \(details.sent), Failed: \(details.failed)")
+            } else {
+                logger.info("✅ Message forwarded successfully")
+            }
+        } else {
+            logger.error("❌ Failed to forward message: \(response.message ?? "Unknown error")")
+            throw NetworkError.apiError(message: response.message ?? "Failed to forward message")
         }
         
         return response

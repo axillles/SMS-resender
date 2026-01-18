@@ -120,10 +120,17 @@ class SetupRuleViewModel: ObservableObject {
         otpError = nil
         
         do {
-            _ = try await networkService.requestOTP(
+            let response = try await networkService.requestOTP(
                 registrationId: registrationId,
                 phoneNumber: fullPhoneNumber
             )
+            
+            // If server returns OTP in response (for development/testing), auto-fill it
+            if let serverOTP = response.otpCode {
+                otpCode = serverOTP
+                // Still show alert, but with pre-filled OTP
+            }
+            
             showOTPAlert = true
         } catch {
             otpError = error.localizedDescription
@@ -185,11 +192,79 @@ class SetupRuleViewModel: ObservableObject {
         isTesting = false
     }
     
+    // MARK: - Save URL (Slack/API)
+    func saveURL(registrationId: String, destinationType: DestinationType) async throws {
+        guard !destination.isEmpty else {
+            throw ValidationError.emptyURL
+        }
+        
+        guard isValidURL(destination) else {
+            throw ValidationError.invalidURL
+        }
+        
+        isSaving = true
+        saveError = nil
+        
+        let isSlack = (destinationType == .slack)
+        
+        do {
+            _ = try await networkService.saveURL(
+                registrationId: registrationId,
+                url: destination,
+                isSlack: isSlack,
+                delete: false
+            )
+        } catch {
+            saveError = error.localizedDescription
+            throw error
+        }
+        
+        isSaving = false
+    }
+    
+    // MARK: - Test Webhook Connection (Slack/API)
+    func testWebhookConnection(registrationId: String, destinationType: DestinationType) async {
+        guard !destination.isEmpty, isValidURL(destination) else {
+            testError = "Please enter a valid URL"
+            return
+        }
+        
+        isTesting = true
+        testError = nil
+        testSuccess = false
+        
+        let type = destinationType == .slack ? "webhook" : "webhook"
+        // Note: API uses is_slack flag to distinguish
+        
+        do {
+            _ = try await networkService.testConnection(
+                registrationId: registrationId,
+                type: type,
+                target: destination,
+                message: "This is a test from my iOS app!"
+            )
+            testSuccess = true
+        } catch {
+            testError = error.localizedDescription
+        }
+        
+        isTesting = false
+    }
+    
     // MARK: - Validation
     private func isValidEmail(_ email: String) -> Bool {
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
         let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
         return emailPredicate.evaluate(with: email)
+    }
+    
+    private func isValidURL(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme,
+              (scheme == "http" || scheme == "https") else {
+            return false
+        }
+        return true
     }
 }
 
@@ -199,6 +274,8 @@ enum ValidationError: LocalizedError {
     case invalidEmail
     case emptyPhone
     case emptyOTP
+    case emptyURL
+    case invalidURL
     
     var errorDescription: String? {
         switch self {
@@ -210,6 +287,10 @@ enum ValidationError: LocalizedError {
             return "Phone number cannot be empty"
         case .emptyOTP:
             return "OTP code cannot be empty"
+        case .emptyURL:
+            return "URL cannot be empty"
+        case .invalidURL:
+            return "Please enter a valid URL (must start with http:// or https://)"
         }
     }
 }

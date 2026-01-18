@@ -46,6 +46,13 @@ struct PhoneDeleteRequest: Codable {
 struct PhoneResponse: Codable {
     let status: String
     let message: String
+    let otpCode: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case status
+        case message
+        case otpCode = "otp_code"
+    }
     
     var isSuccess: Bool {
         return status == "success"

@@ -123,17 +123,23 @@ struct SetupRuleView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Test Message Button (for email and phone)
-                    if destinationType == .email || destinationType == .phone {
+                    // Test Message Button (for email, phone, slack, api)
+                    if destinationType == .email || destinationType == .phone || destinationType == .slack || destinationType == .api {
                         Button(action: {
                             Task {
+                                guard let registrationId = registrationViewModel.getRegistrationId() else {
+                                    viewModel.testError = "Device not registered"
+                                    return
+                                }
+                                
                                 if destinationType == .email {
-                                    await viewModel.testEmailConnection(
-                                        registrationId: registrationViewModel.getRegistrationId() ?? ""
-                                    )
+                                    await viewModel.testEmailConnection(registrationId: registrationId)
                                 } else if destinationType == .phone {
-                                    await viewModel.testPhoneConnection(
-                                        registrationId: registrationViewModel.getRegistrationId() ?? ""
+                                    await viewModel.testPhoneConnection(registrationId: registrationId)
+                                } else if destinationType == .slack || destinationType == .api {
+                                    await viewModel.testWebhookConnection(
+                                        registrationId: registrationId,
+                                        destinationType: destinationType
                                     )
                                 }
                             }
@@ -285,6 +291,17 @@ struct SetupRuleView: View {
             
             do {
                 try await viewModel.savePhone(registrationId: registrationId)
+            } catch {
+                // Error is already set in viewModel
+                return
+            }
+        }
+        // For Slack/API, save to backend
+        else if destinationType == .slack || destinationType == .api {
+            guard !viewModel.destination.isEmpty else { return }
+            
+            do {
+                try await viewModel.saveURL(registrationId: registrationId, destinationType: destinationType)
             } catch {
                 // Error is already set in viewModel
                 return
