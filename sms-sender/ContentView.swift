@@ -22,6 +22,7 @@ struct ContentView: View {
                 }
             } else {
                 HomeView()
+                    .environmentObject(registrationViewModel)
             }
         }
     }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @EnvironmentObject var registrationViewModel: RegistrationViewModel
     @State private var showDestinationPicker = false
     @State private var showSettings = false
     

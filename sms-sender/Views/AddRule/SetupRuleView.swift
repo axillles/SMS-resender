@@ -12,6 +12,7 @@ struct SetupRuleView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = SetupRuleViewModel()
     @ObservedObject var homeViewModel: HomeViewModel
+    @EnvironmentObject var registrationViewModel: RegistrationViewModel
     
     init(destinationType: DestinationType, homeViewModel: HomeViewModel) {
         self.destinationType = destinationType
@@ -26,9 +27,15 @@ struct SetupRuleView: View {
                 VStack(spacing: 20) {
                     // Destination input section
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(destinationType.rawValue.uppercased())
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                        if destinationType == .email {
+                            Text("PROVIDE THE EMAIL ADDRESS YOU WISH TO FORWARD TO")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text(destinationType.rawValue.uppercased())
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                        }
                         
                         TextField(getPlaceholderText(), text: $viewModel.destination)
                             .textFieldStyle(.plain)
@@ -39,6 +46,8 @@ struct SetupRuleView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.black.opacity(0.1), lineWidth: 1)
                             )
+                            .autocapitalization(.none)
+                            .keyboardType(destinationType == .email ? .emailAddress : .default)
                     }
                     .padding(.horizontal)
                     
@@ -52,26 +61,96 @@ struct SetupRuleView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Save Button
-                    Button(action: {
-                        saveRule()
-                    }) {
-                        Text("Save")
-                            .font(.headline)
+                    // Test Message Button (only for email)
+                    if destinationType == .email {
+                        Button(action: {
+                            Task {
+                                await viewModel.testEmailConnection(
+                                    registrationId: registrationViewModel.getRegistrationId() ?? ""
+                                )
+                            }
+                        }) {
+                            HStack {
+                                if viewModel.isTesting {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                }
+                                Text("Send Test Message")
+                                    .font(.headline)
+                            }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.black)
+                            .background(viewModel.testSuccess ? Color.green : Color.blue)
                             .cornerRadius(12)
+                        }
+                        .disabled(viewModel.isTesting)
+                        .padding(.horizontal)
+                        
+                        if let testError = viewModel.testError {
+                            Text(testError)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal)
+                        }
+                        
+                        if viewModel.testSuccess {
+                            Text("Test message sent successfully!")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                                .padding(.horizontal)
+                        }
                     }
+                    
+                    // Save Button
+                    Button(action: {
+                        Task {
+                            await saveRule()
+                        }
+                    }) {
+                        HStack {
+                            if viewModel.isSaving {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            }
+                            Text("Save")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.black)
+                        .cornerRadius(12)
+                    }
+                    .disabled(viewModel.isSaving)
                     .padding(.horizontal)
                     .padding(.top, 20)
+                    
+                    if let saveError = viewModel.saveError {
+                        Text(saveError)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal)
+                    }
                 }
                 .padding(.vertical)
             }
         }
-        .navigationTitle(destinationType.rawValue.capitalized)
+        .navigationTitle(destinationType == .email ? "Email Address" : destinationType.rawValue.capitalized)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    Task {
+                        await saveRule()
+                    }
+                }) {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.blue)
+                }
+                .disabled(viewModel.isSaving || viewModel.destination.isEmpty)
+            }
+        }
     }
     
     private func getPlaceholderText() -> String {
@@ -87,10 +166,31 @@ struct SetupRuleView: View {
         }
     }
     
-    private func saveRule() {
+    private func saveRule() async {
         guard !viewModel.destination.isEmpty else { return }
+        
+        // For email, save to backend first
+        if destinationType == .email {
+            guard let registrationId = registrationViewModel.getRegistrationId() else {
+                viewModel.saveError = "Device not registered"
+                return
+            }
+            
+            do {
+                try await viewModel.saveEmail(registrationId: registrationId)
+            } catch {
+                // Error is already set in viewModel
+                return
+            }
+        }
+        
+        // Create and save rule locally
         let rule = viewModel.createRule(type: destinationType)
         homeViewModel.rules.append(rule)
+        
+        // Save to UserDefaults
+        StorageService.saveForwardingRules(homeViewModel.rules)
+        
         dismiss()
     }
 }

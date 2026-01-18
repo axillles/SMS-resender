@@ -9,6 +9,7 @@ import SwiftUI
 
 struct DestinationPicker: View {
     @ObservedObject var homeViewModel: HomeViewModel
+    @EnvironmentObject var registrationViewModel: RegistrationViewModel
     @Environment(\.dismiss) var dismiss
     @State private var selectedDestination: DestinationType?
     
@@ -62,6 +63,7 @@ struct DestinationPicker: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $selectedDestination) { destination in
             SetupRuleView(destinationType: destination, homeViewModel: homeViewModel)
+                .environmentObject(registrationViewModel)
         }
     }
 }
