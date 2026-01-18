@@ -31,23 +31,85 @@ struct SetupRuleView: View {
                             Text("PROVIDE THE EMAIL ADDRESS YOU WISH TO FORWARD TO")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
+                            
+                            TextField(getPlaceholderText(), text: $viewModel.destination)
+                                .textFieldStyle(.plain)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                )
+                                .autocapitalization(.none)
+                                .keyboardType(.emailAddress)
+                        } else if destinationType == .phone {
+                            Text("PROVIDE THE PHONE NUMBER YOU WISH TO FORWARD TO")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            // Country Code Picker
+                            HStack(spacing: 12) {
+                                Menu {
+                                    ForEach(CountryCode.allCodes) { countryCode in
+                                        Button(action: {
+                                            viewModel.selectedCountryCode = countryCode
+                                        }) {
+                                            HStack {
+                                                Text(countryCode.displayName)
+                                                if viewModel.selectedCountryCode.code == countryCode.code {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(viewModel.selectedCountryCode.displayName)
+                                            .foregroundColor(.primary)
+                                        Image(systemName: "chevron.down")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.white)
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                    )
+                                }
+                            }
+                            
+                            // Phone Number Input
+                            TextField("5551234567", text: $viewModel.phoneNumber)
+                                .textFieldStyle(.plain)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                )
+                                .keyboardType(.phonePad)
                         } else {
                             Text(destinationType.rawValue.uppercased())
                                 .font(.headline)
                                 .foregroundColor(.primary)
+                            
+                            TextField(getPlaceholderText(), text: $viewModel.destination)
+                                .textFieldStyle(.plain)
+                                .padding()
+                                .background(Color.white)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                )
+                                .autocapitalization(.none)
+                                .keyboardType(.default)
                         }
-                        
-                        TextField(getPlaceholderText(), text: $viewModel.destination)
-                            .textFieldStyle(.plain)
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.black.opacity(0.1), lineWidth: 1)
-                            )
-                            .autocapitalization(.none)
-                            .keyboardType(destinationType == .email ? .emailAddress : .default)
                     }
                     .padding(.horizontal)
                     
@@ -61,13 +123,19 @@ struct SetupRuleView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Test Message Button (only for email)
-                    if destinationType == .email {
+                    // Test Message Button (for email and phone)
+                    if destinationType == .email || destinationType == .phone {
                         Button(action: {
                             Task {
-                                await viewModel.testEmailConnection(
-                                    registrationId: registrationViewModel.getRegistrationId() ?? ""
-                                )
+                                if destinationType == .email {
+                                    await viewModel.testEmailConnection(
+                                        registrationId: registrationViewModel.getRegistrationId() ?? ""
+                                    )
+                                } else if destinationType == .phone {
+                                    await viewModel.testPhoneConnection(
+                                        registrationId: registrationViewModel.getRegistrationId() ?? ""
+                                    )
+                                }
                             }
                         }) {
                             HStack {
@@ -100,6 +168,14 @@ struct SetupRuleView: View {
                                 .foregroundColor(.green)
                                 .padding(.horizontal)
                         }
+                    }
+                    
+                    // OTP Error for phone
+                    if destinationType == .phone, let otpError = viewModel.otpError {
+                        Text(otpError)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal)
                     }
                     
                     // Save Button
@@ -136,7 +212,7 @@ struct SetupRuleView: View {
                 .padding(.vertical)
             }
         }
-        .navigationTitle(destinationType == .email ? "Email Address" : destinationType.rawValue.capitalized)
+        .navigationTitle(destinationType == .email ? "Email Address" : (destinationType == .phone ? "Phone Number" : destinationType.rawValue.capitalized))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -148,8 +224,23 @@ struct SetupRuleView: View {
                     Image(systemName: "checkmark")
                         .foregroundColor(.blue)
                 }
-                .disabled(viewModel.isSaving || viewModel.destination.isEmpty)
+                .disabled(viewModel.isSaving || (destinationType == .phone ? viewModel.phoneNumber.isEmpty : viewModel.destination.isEmpty))
             }
+        }
+        .alert("Alert", isPresented: $viewModel.showOTPAlert) {
+            TextField("Enter OTP", text: $viewModel.otpCode)
+                .keyboardType(.numberPad)
+            Button("No", role: .cancel) {
+                viewModel.otpCode = ""
+                viewModel.showOTPAlert = false
+            }
+            Button("Yes") {
+                Task {
+                    await saveRule()
+                }
+            }
+        } message: {
+            Text("Enter OTP sent to your phone number")
         }
     }
     
@@ -167,17 +258,33 @@ struct SetupRuleView: View {
     }
     
     private func saveRule() async {
-        guard !viewModel.destination.isEmpty else { return }
+        guard let registrationId = registrationViewModel.getRegistrationId() else {
+            viewModel.saveError = "Device not registered"
+            return
+        }
         
         // For email, save to backend first
         if destinationType == .email {
-            guard let registrationId = registrationViewModel.getRegistrationId() else {
-                viewModel.saveError = "Device not registered"
-                return
-            }
+            guard !viewModel.destination.isEmpty else { return }
             
             do {
                 try await viewModel.saveEmail(registrationId: registrationId)
+            } catch {
+                // Error is already set in viewModel
+                return
+            }
+        }
+        // For phone, save with OTP
+        else if destinationType == .phone {
+            guard !viewModel.phoneNumber.isEmpty else { return }
+            guard !viewModel.otpCode.isEmpty else {
+                // Request OTP first if not already requested
+                await viewModel.requestOTP(registrationId: registrationId)
+                return // Don't dismiss, wait for OTP
+            }
+            
+            do {
+                try await viewModel.savePhone(registrationId: registrationId)
             } catch {
                 // Error is already set in viewModel
                 return

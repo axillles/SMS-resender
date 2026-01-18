@@ -161,6 +161,98 @@ class NetworkService {
         
         return response
     }
+    
+    // MARK: - Request OTP
+    func requestOTP(registrationId: String, phoneNumber: String) async throws -> PhoneResponse {
+        logger.info("📱 Requesting OTP for phone: \(phoneNumber)")
+        guard let url = APIConstants.requestOTPURL else {
+            logger.error("❌ Invalid request OTP URL")
+            throw NetworkError.invalidURL
+        }
+        
+        logger.info("🔗 Full OTP URL: \(url.absoluteString)")
+        logger.info("🔗 Base URL: \(APIConstants.baseURL)")
+        logger.info("🔗 Endpoint: \(APIConstants.requestOTP)")
+        
+        let request = PhoneOTPRequest(
+            registrationId: registrationId,
+            phoneNumber: phoneNumber
+        )
+        
+        let response = try await performRequest(
+            url: url,
+            body: request,
+            responseType: PhoneResponse.self
+        )
+        
+        if response.isSuccess {
+            logger.info("✅ OTP sent successfully: \(response.message)")
+        } else {
+            logger.error("❌ Failed to send OTP: \(response.message)")
+            throw NetworkError.apiError(message: response.message)
+        }
+        
+        return response
+    }
+    
+    // MARK: - Save Phone Number
+    func savePhone(registrationId: String, phoneNumber: String, otpCode: String) async throws -> PhoneResponse {
+        logger.info("📱 Saving phone: \(phoneNumber) with OTP")
+        guard let url = APIConstants.savePhoneURL else {
+            logger.error("❌ Invalid save phone URL")
+            throw NetworkError.invalidURL
+        }
+        
+        let request = PhoneSaveRequest(
+            registrationId: registrationId,
+            phoneNumber: phoneNumber,
+            otpCode: otpCode
+        )
+        
+        let response = try await performRequest(
+            url: url,
+            body: request,
+            responseType: PhoneResponse.self
+        )
+        
+        if response.isSuccess {
+            logger.info("✅ Phone saved successfully: \(response.message)")
+        } else {
+            logger.error("❌ Failed to save phone: \(response.message)")
+            throw NetworkError.apiError(message: response.message)
+        }
+        
+        return response
+    }
+    
+    // MARK: - Delete Phone Number
+    func deletePhone(registrationId: String, phoneNumber: String) async throws -> PhoneResponse {
+        logger.info("📱 Deleting phone: \(phoneNumber)")
+        guard let url = APIConstants.deletePhoneURL else {
+            logger.error("❌ Invalid delete phone URL")
+            throw NetworkError.invalidURL
+        }
+        
+        let request = PhoneDeleteRequest(
+            registrationId: registrationId,
+            phoneNumber: phoneNumber
+        )
+        
+        let response = try await performRequest(
+            url: url,
+            body: request,
+            responseType: PhoneResponse.self
+        )
+        
+        if response.isSuccess {
+            logger.info("✅ Phone deleted successfully: \(response.message)")
+        } else {
+            logger.error("❌ Failed to delete phone: \(response.message)")
+            throw NetworkError.apiError(message: response.message)
+        }
+        
+        return response
+    }
 }
 
 // MARK: - Network Errors
