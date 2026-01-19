@@ -25,6 +25,11 @@ final class SettingsViewModel: ObservableObject {
             action: .setup
         ),
         SettingsRow(
+            title: "Show Onboarding",
+            icon: "play.circle.fill",
+            action: .showOnboarding
+        ),
+        SettingsRow(
             title: "Restore Purchase",
             icon: "person.crop.circle",
             action: .restore

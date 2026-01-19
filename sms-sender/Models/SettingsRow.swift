@@ -18,6 +18,7 @@ enum SettingsAction {
     case subscription
     case setup
     case restore
+    case showOnboarding
     case privacy
     case terms
     case deleteAccount

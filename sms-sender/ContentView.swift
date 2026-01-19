@@ -7,12 +7,25 @@
 
 import SwiftUI
 
+extension Notification.Name {
+    static let showOnboarding = Notification.Name("showOnboarding")
+}
+
 struct ContentView: View {
     @EnvironmentObject var registrationViewModel: RegistrationViewModel
+    @State private var showOnboarding: Bool = {
+        // Initialize based on onboarding status
+        return !StorageService.hasCompletedOnboarding()
+    }()
     
     var body: some View {
         Group {
-            if registrationViewModel.isRegistering {
+            if showOnboarding {
+                OnboardingView(
+                    isPresented: $showOnboarding,
+                    isFirstTime: !StorageService.hasCompletedOnboarding()
+                )
+            } else if registrationViewModel.isRegistering {
                 RegistrationLoadingView()
             } else if let error = registrationViewModel.registrationError {
                 RegistrationErrorView(error: error) {
@@ -24,6 +37,9 @@ struct ContentView: View {
                 HomeView()
                     .environmentObject(registrationViewModel)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showOnboarding)) { _ in
+            showOnboarding = true
         }
     }
 }

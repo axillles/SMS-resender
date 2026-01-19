@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-
     @StateObject private var viewModel = SettingsViewModel()
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationStack {
@@ -37,6 +37,16 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationDestination(item: $viewModel.selectedAction) { action in
                 destinationView(for: action)
+            }
+            .onChange(of: viewModel.selectedAction) { oldValue, newValue in
+                if newValue == .showOnboarding {
+                    // Post notification to show onboarding
+                    NotificationCenter.default.post(name: .showOnboarding, object: nil)
+                    // Reset selection after a moment
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        viewModel.selectedAction = nil
+                    }
+                }
             }
         }
     }
@@ -81,6 +91,10 @@ struct SettingsView: View {
 
         case .restore:
             Text("Restore Purchase")
+            
+        case .showOnboarding:
+            // This case is handled in onChange, but we need it for the switch
+            EmptyView()
 
         case .privacy:
             Text("Privacy Policy")

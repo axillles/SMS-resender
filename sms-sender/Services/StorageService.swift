@@ -19,6 +19,7 @@ class StorageService {
         static let isRegistered = "is_registered"
         static let lastProfileSync = "last_profile_sync"
         static let forwardingRules = "forwarding_rules"
+        static let hasCompletedOnboarding = "has_completed_onboarding"
     }
     
     // MARK: - Registration ID
@@ -86,6 +87,20 @@ class StorageService {
         userDefaults.removeObject(forKey: Keys.forwardingRules)
     }
     
+    // MARK: - Onboarding
+    static func setOnboardingCompleted(_ completed: Bool) {
+        userDefaults.set(completed, forKey: Keys.hasCompletedOnboarding)
+        userDefaults.synchronize()
+    }
+    
+    static func hasCompletedOnboarding() -> Bool {
+        // Check if key exists - if not, it's first launch
+        if userDefaults.object(forKey: Keys.hasCompletedOnboarding) == nil {
+            return false
+        }
+        return userDefaults.bool(forKey: Keys.hasCompletedOnboarding)
+    }
+    
     // MARK: - Clear All Data
     static func clearAll() {
         userDefaults.removeObject(forKey: Keys.registrationId)
@@ -95,5 +110,6 @@ class StorageService {
         userDefaults.removeObject(forKey: Keys.isRegistered)
         userDefaults.removeObject(forKey: Keys.lastProfileSync)
         userDefaults.removeObject(forKey: Keys.forwardingRules)
+        userDefaults.removeObject(forKey: Keys.hasCompletedOnboarding)
     }
 }
