@@ -6,10 +6,16 @@
 //
 
 import SwiftUI
+import AppIntents
 
 @main
 struct sms_senderApp: App {
     @StateObject private var registrationViewModel = RegistrationViewModel()
+    
+    init() {
+        // Регистрируем App Intent для Shortcuts
+        ForwardSMSIntent.self
+    }
     
     var body: some Scene {
         WindowGroup {
