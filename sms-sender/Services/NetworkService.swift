@@ -289,6 +289,31 @@ class NetworkService {
         return response
     }
     
+    // MARK: - Get Profile
+    func getProfile(registrationId: String) async throws -> ProfileResponse {
+        logger.info("👤 Getting profile for registration ID: \(registrationId)")
+        guard let url = APIConstants.getProfileURL else {
+            logger.error("❌ Invalid get profile URL")
+            throw NetworkError.invalidURL
+        }
+        
+        let request = ProfileRequest(registrationId: registrationId)
+        let response = try await performRequest(
+            url: url,
+            body: request,
+            responseType: ProfileResponse.self
+        )
+        
+        if response.isSuccess {
+            logger.info("✅ Profile retrieved successfully")
+        } else {
+            logger.error("❌ Failed to get profile: \(response.message ?? "Unknown error")")
+            throw NetworkError.apiError(message: response.message ?? "Failed to get profile")
+        }
+        
+        return response
+    }
+    
     // MARK: - Forward Message
     func forward(registrationId: String, message: String, sender: String, timestamp: Date, subject: String? = nil) async throws -> ForwardResponse {
         logger.info("📨 Forwarding message from: \(sender)")

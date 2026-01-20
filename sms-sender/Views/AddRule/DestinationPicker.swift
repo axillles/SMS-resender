@@ -10,8 +10,10 @@ import SwiftUI
 struct DestinationPicker: View {
     @ObservedObject var homeViewModel: HomeViewModel
     @EnvironmentObject var registrationViewModel: RegistrationViewModel
+    @StateObject private var subscriptionService = SubscriptionService.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedDestination: DestinationType?
+    @State private var showPaywall = false
     
     var body: some View {
         ZStack {
@@ -26,7 +28,7 @@ struct DestinationPicker: View {
                             icon: DestinationType.email.iconName,
                             title: "Email"
                         ) {
-                            selectedDestination = .email
+                            handleDestinationSelection(.email)
                         }
                         
                         DestinationButton(
@@ -34,7 +36,7 @@ struct DestinationPicker: View {
                             icon: DestinationType.phone.iconName,
                             title: "Phone"
                         ) {
-                            selectedDestination = .phone
+                            handleDestinationSelection(.phone)
                         }
                     }
                     
@@ -44,7 +46,7 @@ struct DestinationPicker: View {
                             icon: "number",
                             title: "Slack"
                         ) {
-                            selectedDestination = .slack
+                            handleDestinationSelection(.slack)
                         }
                         
                         DestinationButton(
@@ -52,7 +54,7 @@ struct DestinationPicker: View {
                             icon: DestinationType.api.iconName,
                             title: "API"
                         ) {
-                            selectedDestination = .api
+                            handleDestinationSelection(.api)
             }
         }
     }
@@ -64,6 +66,36 @@ struct DestinationPicker: View {
         .navigationDestination(item: $selectedDestination) { destination in
             SetupRuleView(destinationType: destination, homeViewModel: homeViewModel)
                 .environmentObject(registrationViewModel)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(isPresented: $showPaywall)
+        }
+        .onChange(of: showPaywall) { oldValue, newValue in
+            // После закрытия paywall проверяем статус подписки
+            if oldValue == true && newValue == false {
+                Task {
+                    await subscriptionService.checkSubscriptionStatus()
+                    // Если подписка активирована, разрешаем добавление правила
+                    if subscriptionService.hasActiveSubscription, let pendingDestination = selectedDestination {
+                        // selectedDestination уже установлен, navigation произойдет автоматически
+                    }
+                }
+            }
+        }
+        .task {
+            // Проверяем статус подписки при открытии
+            await subscriptionService.checkSubscriptionStatus()
+        }
+    }
+    
+    private func handleDestinationSelection(_ destination: DestinationType) {
+        // Проверяем подписку перед добавлением правила
+        if subscriptionService.hasActiveSubscription {
+            selectedDestination = destination
+        } else {
+            // Сохраняем выбранное назначение и показываем paywall
+            selectedDestination = destination
+            showPaywall = true
         }
     }
 }

@@ -25,13 +25,20 @@ class SMSForwardingService {
     func forwardSMS(message: String, sender: String, timestamp: Date, subject: String? = nil) async {
         logger.info("📨 Received SMS forwarding request: sender=\(sender), message length=\(message.count)")
         
-        // 1. Получаем registration_id
+        // 1. Проверяем наличие активной подписки
+        await SubscriptionService.shared.checkSubscriptionStatus()
+        if !SubscriptionService.shared.hasActiveSubscription {
+            logger.error("❌ Cannot forward: No active subscription")
+            return
+        }
+        
+        // 2. Получаем registration_id
         guard let registrationId = StorageService.getRegistrationId() else {
             logger.error("❌ Cannot forward: Device not registered")
             return
         }
         
-        // 2. Получаем все правила пересылки
+        // 3. Получаем все правила пересылки
         let rules = StorageService.getForwardingRules()
         
         if rules.isEmpty {

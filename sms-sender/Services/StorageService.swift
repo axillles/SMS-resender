@@ -20,6 +20,8 @@ class StorageService {
         static let lastProfileSync = "last_profile_sync"
         static let forwardingRules = "forwarding_rules"
         static let hasCompletedOnboarding = "has_completed_onboarding"
+        static let hasActiveSubscription = "has_active_subscription"
+        static let hasShownPaywallOnLaunch = "has_shown_paywall_on_launch"
     }
     
     // MARK: - Registration ID
@@ -101,6 +103,24 @@ class StorageService {
         return userDefaults.bool(forKey: Keys.hasCompletedOnboarding)
     }
     
+    // MARK: - Subscription Status
+    static func setHasActiveSubscription(_ hasSubscription: Bool) {
+        userDefaults.set(hasSubscription, forKey: Keys.hasActiveSubscription)
+    }
+    
+    static func hasActiveSubscription() -> Bool {
+        return userDefaults.bool(forKey: Keys.hasActiveSubscription)
+    }
+    
+    // MARK: - Paywall Display Tracking
+    static func setHasShownPaywallOnLaunch(_ shown: Bool) {
+        userDefaults.set(shown, forKey: Keys.hasShownPaywallOnLaunch)
+    }
+    
+    static func hasShownPaywallOnLaunch() -> Bool {
+        return userDefaults.bool(forKey: Keys.hasShownPaywallOnLaunch)
+    }
+    
     // MARK: - Clear All Data
     static func clearAll() {
         userDefaults.removeObject(forKey: Keys.registrationId)
@@ -111,5 +131,7 @@ class StorageService {
         userDefaults.removeObject(forKey: Keys.lastProfileSync)
         userDefaults.removeObject(forKey: Keys.forwardingRules)
         userDefaults.removeObject(forKey: Keys.hasCompletedOnboarding)
+        userDefaults.removeObject(forKey: Keys.hasActiveSubscription)
+        userDefaults.removeObject(forKey: Keys.hasShownPaywallOnLaunch)
     }
 }

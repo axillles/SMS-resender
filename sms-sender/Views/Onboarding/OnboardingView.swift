@@ -73,6 +73,10 @@ struct OnboardingView: View {
         withAnimation {
             isPresented = false
         }
+        // Show paywall after onboarding if no active subscription
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            NotificationCenter.default.post(name: .showPaywall, object: nil)
+        }
     }
 }
 

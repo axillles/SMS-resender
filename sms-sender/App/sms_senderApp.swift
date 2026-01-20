@@ -27,6 +27,12 @@ struct sms_senderApp: App {
                         await registrationViewModel.register()
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    // Проверяем статус подписки при возврате приложения в foreground
+                    Task {
+                        await SubscriptionService.shared.checkSubscriptionStatus()
+                    }
+                }
         }
     }
 }

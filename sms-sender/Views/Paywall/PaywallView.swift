@@ -28,6 +28,16 @@ struct PaywallView: View {
         self.isPresented = isPresented
     }
     
+    private func handlePurchaseSuccess() {
+        // Update subscription status after successful purchase
+        // Это проверит и StoreKit транзакции, и API статус
+        Task {
+            await SubscriptionService.shared.refreshSubscriptionStatus()
+        }
+        dismiss()
+        isPresented?.wrappedValue = false
+    }
+    
     var body: some View {
         ZStack {
             // Dark gradient background
@@ -217,8 +227,7 @@ struct PaywallView: View {
             Task {
                 let success = await viewModel.purchase()
                 if success {
-                    dismiss()
-                    isPresented?.wrappedValue = false
+                    handlePurchaseSuccess()
                 }
             }
         }) {

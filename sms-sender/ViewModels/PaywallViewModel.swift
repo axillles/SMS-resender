@@ -107,6 +107,10 @@ class PaywallViewModel: ObservableObject {
                 case .verified(let transaction):
                     // Transaction is verified, complete it
                     await transaction.finish()
+                    
+                    // Update subscription status (проверит и StoreKit, и API)
+                    await SubscriptionService.shared.refreshSubscriptionStatus()
+                    
                     purchaseInProgress = false
                     return true
                 case .unverified(_, let error):
