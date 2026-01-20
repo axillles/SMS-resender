@@ -22,6 +22,7 @@ class StorageService {
         static let hasCompletedOnboarding = "has_completed_onboarding"
         static let hasActiveSubscription = "has_active_subscription"
         static let hasShownPaywallOnLaunch = "has_shown_paywall_on_launch"
+        static let hasForwardedFirstMessage = "has_forwarded_first_message"
     }
     
     // MARK: - Registration ID
@@ -121,6 +122,15 @@ class StorageService {
         return userDefaults.bool(forKey: Keys.hasShownPaywallOnLaunch)
     }
     
+    // MARK: - First Message Forwarding
+    static func setHasForwardedFirstMessage(_ forwarded: Bool) {
+        userDefaults.set(forwarded, forKey: Keys.hasForwardedFirstMessage)
+    }
+    
+    static func hasForwardedFirstMessage() -> Bool {
+        return userDefaults.bool(forKey: Keys.hasForwardedFirstMessage)
+    }
+    
     // MARK: - Clear All Data
     static func clearAll() {
         userDefaults.removeObject(forKey: Keys.registrationId)
@@ -133,5 +143,6 @@ class StorageService {
         userDefaults.removeObject(forKey: Keys.hasCompletedOnboarding)
         userDefaults.removeObject(forKey: Keys.hasActiveSubscription)
         userDefaults.removeObject(forKey: Keys.hasShownPaywallOnLaunch)
+        userDefaults.removeObject(forKey: Keys.hasForwardedFirstMessage)
     }
 }

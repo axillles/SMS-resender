@@ -77,10 +77,6 @@ struct PaywallView: View {
                         featureIconsSection
                             .padding(.bottom, 20)
                         
-                        // Pagination dots
-                        paginationDots
-                            .padding(.bottom, 40)
-                        
                         // Subscription Options
                         if !viewModel.products.isEmpty {
                             subscriptionOptionsSection
@@ -189,19 +185,6 @@ struct PaywallView: View {
         }
         .frame(height: 180)
     }
-    
-    // MARK: - Pagination Dots
-    
-    private var paginationDots: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(index == 0 ? Color.white : Color.white.opacity(0.3))
-                    .frame(width: 6, height: 6)
-            }
-        }
-    }
-    
     // MARK: - Subscription Options
     
     private var subscriptionOptionsSection: some View {

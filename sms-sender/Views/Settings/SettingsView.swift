@@ -39,7 +39,7 @@ struct SettingsView: View {
                 destinationView(for: action)
             }
             .onChange(of: viewModel.selectedAction) { oldValue, newValue in
-                if newValue == .showOnboarding {
+                if newValue == .showOnboarding || newValue == .subscription {
                     // Post notification to show onboarding
                     NotificationCenter.default.post(name: .showOnboarding, object: nil)
                     // Reset selection after a moment
@@ -61,7 +61,7 @@ struct SettingsView: View {
             if let title {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .padding(.horizontal, 8)
             }
 
@@ -84,10 +84,8 @@ struct SettingsView: View {
     private func destinationView(for action: SettingsAction) -> some View {
         switch action {
         case .subscription:
-            Text("Subscription plans")
-
-        case .setup:
-            Text("Setup Instructions")
+            // This case is handled in onChange, but we need it for the switch
+            EmptyView()
 
         case .restore:
             Text("Restore Purchase")
@@ -107,6 +105,10 @@ struct SettingsView: View {
 
         case .contact:
             Text("Contact Us")
+            
+        case .setup:
+            // This case is no longer used, but kept for compatibility
+            EmptyView()
         }
     }
 }
@@ -118,18 +120,18 @@ struct SettingsRowView: View {
         HStack(spacing: 16) {
             Image(systemName: row.icon)
                 .frame(width: 24)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
 
             Text(row.title)
-                .foregroundColor(.black)
+                .foregroundColor(.primary)
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color.white)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
     }
 }
 

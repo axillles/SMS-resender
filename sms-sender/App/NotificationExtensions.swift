@@ -10,4 +10,5 @@ import Foundation
 extension Notification.Name {
     static let showOnboarding = Notification.Name("showOnboarding")
     static let showPaywall = Notification.Name("showPaywall")
+    static let firstMessageForwarded = Notification.Name("firstMessageForwarded")
 }

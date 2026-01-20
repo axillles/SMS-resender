@@ -13,17 +13,12 @@ final class SettingsViewModel: ObservableObject {
     let subscriptionSection: [SettingsRow] = [
         SettingsRow(
             title: "Subscription plans",
-            icon: "starburst.fill",
+            icon: "creditcard.fill",
             action: .subscription
         )
     ]
 
     let instructionsSection: [SettingsRow] = [
-        SettingsRow(
-            title: "Setup Instructions",
-            icon: "questionmark.circle",
-            action: .setup
-        ),
         SettingsRow(
             title: "Show Onboarding",
             icon: "play.circle.fill",

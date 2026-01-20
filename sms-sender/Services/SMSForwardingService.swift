@@ -74,6 +74,14 @@ class SMSForwardingService {
             )
             
             if response.isSuccess {
+                // Отмечаем, что первое сообщение было отправлено
+                if !StorageService.hasForwardedFirstMessage() {
+                    StorageService.setHasForwardedFirstMessage(true)
+                    logger.info("🎉 First message forwarded successfully!")
+                    // Отправляем уведомление для обновления UI
+                    NotificationCenter.default.post(name: .firstMessageForwarded, object: nil)
+                }
+                
                 if let details = response.details {
                     logger.info("✅ Message forwarded successfully. Sent: \(details.sent), Failed: \(details.failed)")
                 } else {

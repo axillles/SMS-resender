@@ -12,30 +12,45 @@ struct HomeView: View {
     @EnvironmentObject var registrationViewModel: RegistrationViewModel
     @State private var showDestinationPicker = false
     @State private var showSettings = false
+    @State private var hasForwardedFirstMessage = StorageService.hasForwardedFirstMessage()
     
     var body: some View {
         NavigationStack{
             ZStack{
                 Color(UIColor.systemGroupedBackground).ignoresSafeArea()
-                Group{
-                    if viewModel.rules.isEmpty{
-                        emptyStateView
+                VStack(spacing: 0) {
+                    // Warning banner
+                    if !hasForwardedFirstMessage {
+                        setupWarningBanner
+                            .padding(.horizontal)
+                            .padding(.top, 8)
                     }
-                    else{
-                        rulesStateView
+                    Spacer()
+                    Group{
+                        if viewModel.rules.isEmpty{
+                            emptyStateView
+                        }
+                        else{
+                            rulesStateView
+                        }
                     }
+                    Spacer()
                 }
                 VStack{
                     Spacer()
                     Button(action: {
                         showDestinationPicker = true
                     }) {
-                        Image(systemName: "plus.circle.fill")
-                            .resizable()
-                            .frame(width: 60, height: 60)
-                            .foregroundColor(.black)
-                            .background(Color.white.clipShape(Circle()))
-                            .shadow(radius: 4)
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 60, height: 60)
+                                .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+                            
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
                     .padding(.bottom, 30)
                 }
@@ -46,20 +61,70 @@ struct HomeView: View {
              }
              .navigationDestination(isPresented: $showSettings){
                  SettingsView()
-             }             .toolbar {
+             }
+             .toolbar {
                  ToolbarItem(placement: .navigationBarTrailing) {
                      Button(action: {
                          showSettings = true
                      }) {
                          Image(systemName: "gearshape.fill")
                              .resizable()
-                             .foregroundColor(.black)
                              .frame(width: 30, height: 30)
-                             .foregroundColor(.primary)
+                             .foregroundColor(.secondary)
                      }
                  }
              }
+             .onReceive(NotificationCenter.default.publisher(for: .firstMessageForwarded)) { _ in
+                 // Скрываем плашку после первой отправки сообщения
+                 hasForwardedFirstMessage = true
+             }
+             .onAppear {
+                 // Обновляем состояние при появлении экрана
+                 hasForwardedFirstMessage = StorageService.hasForwardedFirstMessage()
+                 // Обновляем правила при появлении экрана
+                 viewModel.loadRules()
+             }
         }
+    }
+    
+    // MARK: - Setup Warning Banner
+    private var setupWarningBanner: some View {
+        Button(action: {
+            NotificationCenter.default.post(name: .showOnboarding, object: nil)
+        }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Finish Setup to Start Forwarding")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(Color(red: 0.8, green: 0.6, blue: 0.4))
+                        .font(.system(size: 20))
+                    
+                    Text("This warning will disappear after you forward your first message.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(red: 0.98, green: 0.96, blue: 0.94))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(red: 0.85, green: 0.75, blue: 0.65), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     // Appears when No rules
@@ -118,11 +183,11 @@ struct RuleRow: View {
                 .foregroundColor(.gray)
         }
         .padding()
-        .background(Color.white)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
         )
     }
 }
