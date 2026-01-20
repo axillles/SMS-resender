@@ -27,7 +27,7 @@ class SMSForwardingService {
         
         // 1. Проверяем наличие активной подписки
         await SubscriptionService.shared.checkSubscriptionStatus()
-        if !SubscriptionService.shared.hasActiveSubscription {
+        if await !SubscriptionService.shared.hasActiveSubscription {
             logger.error("❌ Cannot forward: No active subscription")
             return
         }

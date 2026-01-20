@@ -27,26 +27,24 @@ struct OnboardingView: View {
             ZStack {
                 Color(UIColor.systemGroupedBackground).ignoresSafeArea()
                 
-                TabView(selection: $currentPage) {
-                    ForEach(0..<totalPages, id: \.self) { index in
-                        OnboardingStepView(
-                            stepNumber: index,
-                            isLastStep: index == totalPages - 1,
-                            onNext: {
-                                if index < totalPages - 1 {
-                                    withAnimation {
-                                        currentPage = index + 1
+                PageViewController(
+                    currentPage: $currentPage,
+                    pages: (0..<totalPages).map { index in
+                        AnyView(
+                            OnboardingStepView(
+                                stepNumber: index,
+                                isLastStep: index == totalPages - 1,
+                                onNext: {
+                                    if index < totalPages - 1 {
+                                        goToPage(index + 1)
+                                    } else {
+                                        completeOnboarding()
                                     }
-                                } else {
-                                    completeOnboarding()
                                 }
-                            }
+                            )
                         )
-                        .tag(index)
                     }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .indexViewStyle(.page(backgroundDisplayMode: .never))
+                )
             }
             .navigationTitle("Setup Guide")
             .navigationBarTitleDisplayMode(.inline)
@@ -63,6 +61,15 @@ struct OnboardingView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+    
+    private func goToPage(_ page: Int) {
+        // Используем DispatchQueue для гарантии, что анимация выполнится
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                self.currentPage = page
             }
         }
     }
@@ -345,6 +352,110 @@ class PlayerContainerView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         playerLayer?.frame = bounds
+    }
+}
+
+// MARK: - Page View Controller with Swipe Animation
+struct PageViewController: UIViewControllerRepresentable {
+    @Binding var currentPage: Int
+    let pages: [AnyView]
+    
+    func makeUIViewController(context: Context) -> UIPageViewController {
+        let pageViewController = UIPageViewController(
+            transitionStyle: .scroll,
+            navigationOrientation: .horizontal
+        )
+        pageViewController.dataSource = context.coordinator
+        pageViewController.delegate = context.coordinator
+        
+        if let firstPage = context.coordinator.viewControllers.first {
+            pageViewController.setViewControllers(
+                [firstPage],
+                direction: .forward,
+                animated: false
+            )
+        }
+        
+        return pageViewController
+    }
+    
+    func updateUIViewController(_ pageViewController: UIPageViewController, context: Context) {
+        guard currentPage >= 0 && currentPage < context.coordinator.viewControllers.count else {
+            return
+        }
+        
+        let currentViewController = context.coordinator.viewControllers[currentPage]
+        let displayedViewController = pageViewController.viewControllers?.first
+        
+        // Проверяем, что текущий контроллер не является уже отображаемым
+        if displayedViewController !== currentViewController {
+            let direction: UIPageViewController.NavigationDirection = 
+                currentPage > context.coordinator.currentPage ? .forward : .reverse
+            
+            pageViewController.setViewControllers(
+                [currentViewController],
+                direction: direction,
+                animated: true
+            )
+            
+            context.coordinator.currentPage = currentPage
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+        var parent: PageViewController
+        var viewControllers: [UIHostingController<AnyView>] = []
+        var currentPage: Int = 0
+        
+        init(_ parent: PageViewController) {
+            self.parent = parent
+            self.viewControllers = parent.pages.map { page in
+                let hostingController = UIHostingController(rootView: page)
+                hostingController.view.backgroundColor = .clear
+                return hostingController
+            }
+            self.currentPage = parent.currentPage
+        }
+        
+        func pageViewController(
+            _ pageViewController: UIPageViewController,
+            viewControllerBefore viewController: UIViewController
+        ) -> UIViewController? {
+            guard let index = viewControllers.firstIndex(where: { $0 === viewController }),
+                  index > 0 else {
+                return nil
+            }
+            return viewControllers[index - 1]
+        }
+        
+        func pageViewController(
+            _ pageViewController: UIPageViewController,
+            viewControllerAfter viewController: UIViewController
+        ) -> UIViewController? {
+            guard let index = viewControllers.firstIndex(where: { $0 === viewController }),
+                  index < viewControllers.count - 1 else {
+                return nil
+            }
+            return viewControllers[index + 1]
+        }
+        
+        func pageViewController(
+            _ pageViewController: UIPageViewController,
+            didFinishAnimating finished: Bool,
+            previousViewControllers: [UIViewController],
+            transitionCompleted completed: Bool
+        ) {
+            if completed,
+               let currentViewController = pageViewController.viewControllers?.first,
+               let index = viewControllers.firstIndex(where: { $0 === currentViewController }) {
+                currentPage = index
+                parent.currentPage = index
+            }
+        }
     }
 }
 
