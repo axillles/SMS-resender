@@ -13,10 +13,14 @@ struct SetupRuleView: View {
     @StateObject private var viewModel = SetupRuleViewModel()
     @ObservedObject var homeViewModel: HomeViewModel
     @EnvironmentObject var registrationViewModel: RegistrationViewModel
+    let editingRule: ForwardingRule?
+    var onSaveComplete: (() -> Void)?
     
-    init(destinationType: DestinationType, homeViewModel: HomeViewModel) {
+    init(destinationType: DestinationType, homeViewModel: HomeViewModel, editingRule: ForwardingRule? = nil, onSaveComplete: (() -> Void)? = nil) {
         self.destinationType = destinationType
         self._homeViewModel = ObservedObject(wrappedValue: homeViewModel)
+        self.editingRule = editingRule
+        self.onSaveComplete = onSaveComplete
     }
     
     var body: some View {
@@ -25,7 +29,6 @@ struct SetupRuleView: View {
             
             ScrollView {
                 VStack(spacing: 20) {
-                    // Destination input section
                     VStack(alignment: .leading, spacing: 12) {
                         if destinationType == .email {
                             Text("PROVIDE THE EMAIL ADDRESS YOU WISH TO FORWARD TO")
@@ -48,7 +51,6 @@ struct SetupRuleView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
-                            // Country Code Picker
                             HStack(spacing: 12) {
                                 Menu {
                                     ForEach(CountryCode.allCodes) { countryCode in
@@ -82,7 +84,6 @@ struct SetupRuleView: View {
                                 }
                             }
                             
-                            // Phone Number Input
                             TextField("5551234567", text: $viewModel.phoneNumber)
                                 .textFieldStyle(.plain)
                                 .padding()
@@ -113,7 +114,6 @@ struct SetupRuleView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Schedule Component
                     ScheduleComponent(
                         isScheduleEnabled: $viewModel.isScheduleEnabled,
                         isAllDay: $viewModel.isAllDay,
@@ -123,7 +123,6 @@ struct SetupRuleView: View {
                     )
                     .padding(.horizontal)
                     
-                    // Test Message Button (for email, phone, slack, api)
                     if destinationType == .email || destinationType == .phone || destinationType == .slack || destinationType == .api {
                         Button(action: {
                             Task {
@@ -176,7 +175,6 @@ struct SetupRuleView: View {
                         }
                     }
                     
-                    // OTP Error for phone
                     if destinationType == .phone, let otpError = viewModel.otpError {
                         Text(otpError)
                             .font(.caption)
@@ -184,7 +182,6 @@ struct SetupRuleView: View {
                             .padding(.horizontal)
                     }
                     
-                    // Save Button
                     Button(action: {
                         Task {
                             await saveRule()
@@ -233,6 +230,11 @@ struct SetupRuleView: View {
                 .disabled(viewModel.isSaving || (destinationType == .phone ? viewModel.phoneNumber.isEmpty : viewModel.destination.isEmpty))
             }
         }
+        .onAppear {
+            if let rule = editingRule {
+                viewModel.loadRule(rule)
+            }
+        }
         .alert("Alert", isPresented: $viewModel.showOTPAlert) {
             TextField("Enter OTP", text: $viewModel.otpCode)
                 .keyboardType(.numberPad)
@@ -269,57 +271,104 @@ struct SetupRuleView: View {
             return
         }
         
-        // For email, save to backend first
+        if let editingRule = editingRule {
+            let newDestination: String
+            if destinationType == .phone {
+                newDestination = viewModel.fullPhoneNumber
+            } else {
+                newDestination = viewModel.destination
+            }
+            
+            if editingRule.destination != newDestination {
+                do {
+                    if editingRule.type == .email {
+                        _ = try await NetworkService.shared.saveEmail(
+                            registrationId: registrationId,
+                            emailAddress: editingRule.destination,
+                            delete: true
+                        )
+                    } else if editingRule.type == .phone {
+                        _ = try await NetworkService.shared.deletePhone(
+                            registrationId: registrationId,
+                            phoneNumber: editingRule.destination
+                        )
+                    } else if editingRule.type == .slack || editingRule.type == .api {
+                        _ = try await NetworkService.shared.saveURL(
+                            registrationId: registrationId,
+                            url: editingRule.destination,
+                            isSlack: editingRule.type == .slack,
+                            delete: true
+                        )
+                    }
+                } catch {
+                    viewModel.saveError = "Failed to delete old destination: \(error.localizedDescription)"
+                    return
+                }
+            }
+        }
+        
         if destinationType == .email {
             guard !viewModel.destination.isEmpty else { return }
             
             do {
                 try await viewModel.saveEmail(registrationId: registrationId)
             } catch {
-                // Error is already set in viewModel
                 return
             }
         }
-        // For phone, save with OTP
         else if destinationType == .phone {
             guard !viewModel.phoneNumber.isEmpty else { return }
-            guard !viewModel.otpCode.isEmpty else {
-                // Request OTP first if not already requested
-                await viewModel.requestOTP(registrationId: registrationId)
-                return // Don't dismiss, wait for OTP
+            
+            let newDestination = viewModel.fullPhoneNumber
+            let destinationChanged = editingRule?.destination != newDestination
+            
+            if destinationChanged {
+                guard !viewModel.otpCode.isEmpty else {
+                    await viewModel.requestOTP(registrationId: registrationId)
+                    return
+                }
             }
             
-            do {
-                try await viewModel.savePhone(registrationId: registrationId)
-            } catch {
-                // Error is already set in viewModel
-                return
+            if destinationChanged {
+                do {
+                    try await viewModel.savePhone(registrationId: registrationId)
+                } catch {
+                    return
+                }
             }
         }
-        // For Slack/API, save to backend
         else if destinationType == .slack || destinationType == .api {
             guard !viewModel.destination.isEmpty else { return }
             
-            do {
-                try await viewModel.saveURL(registrationId: registrationId, destinationType: destinationType)
-            } catch {
-                // Error is already set in viewModel
-                return
+            let destinationChanged = editingRule?.destination != viewModel.destination
+            if destinationChanged {
+                do {
+                    try await viewModel.saveURL(registrationId: registrationId, destinationType: destinationType)
+                } catch {
+                    return
+                }
             }
         }
         
-        // Create and save rule locally
         let rule = viewModel.createRule(type: destinationType)
-        homeViewModel.rules.append(rule)
         
-        // Save to UserDefaults
+        if let editingRule = editingRule {
+            homeViewModel.updateRule(editingRule, with: rule)
+        } else {
+            homeViewModel.rules.append(rule)
+        }
+        
         StorageService.saveForwardingRules(homeViewModel.rules)
         
         dismiss()
         
-        // Show paywall after adding rule if no active subscription
+        if editingRule == nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                onSaveComplete?()
+            }
+        }
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Используем синхронную проверку из кеша
             if !SubscriptionService.shared.hasActiveSubscriptionSync {
                 NotificationCenter.default.post(name: .showPaywall, object: nil)
             }

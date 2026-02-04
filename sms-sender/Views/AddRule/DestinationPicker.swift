@@ -20,7 +20,6 @@ struct DestinationPicker: View {
             Color(UIColor.systemGroupedBackground).ignoresSafeArea()
             
             VStack(spacing: 20) {
-                // 2x2 Grid of destination buttons
                 VStack(spacing: 20) {
                     HStack(spacing: 20) {
                         DestinationButton(
@@ -64,36 +63,36 @@ struct DestinationPicker: View {
         .navigationTitle("New Destination")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $selectedDestination) { destination in
-            SetupRuleView(destinationType: destination, homeViewModel: homeViewModel)
-                .environmentObject(registrationViewModel)
+            SetupRuleView(
+                destinationType: destination,
+                homeViewModel: homeViewModel,
+                onSaveComplete: {
+                    dismiss()
+                }
+            )
+            .environmentObject(registrationViewModel)
         }
         .sheet(isPresented: $showPaywall) {
             PaywallView(isPresented: $showPaywall)
         }
         .onChange(of: showPaywall) { oldValue, newValue in
-            // После закрытия paywall проверяем статус подписки
             if oldValue == true && newValue == false {
                 Task {
                     await subscriptionService.checkSubscriptionStatus()
-                    // Если подписка активирована, разрешаем добавление правила
                     if subscriptionService.hasActiveSubscription, let pendingDestination = selectedDestination {
-                        // selectedDestination уже установлен, navigation произойдет автоматически
                     }
                 }
             }
         }
         .task {
-            // Проверяем статус подписки при открытии
             await subscriptionService.checkSubscriptionStatus()
         }
     }
     
     private func handleDestinationSelection(_ destination: DestinationType) {
-        // Проверяем подписку перед добавлением правила
         if subscriptionService.hasActiveSubscription {
             selectedDestination = destination
         } else {
-            // Сохраняем выбранное назначение и показываем paywall
             selectedDestination = destination
             showPaywall = true
         }

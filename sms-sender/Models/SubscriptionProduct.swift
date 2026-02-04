@@ -4,6 +4,8 @@
 //
 //  Created by Артем Гавrilов on 10.01.26.
 //
+//  Product IDs в App Store Connect должны совпадать: week (недельная), year (годовая).
+//
 
 import Foundation
 import StoreKit
@@ -24,9 +26,9 @@ enum SubscriptionPeriod: String, CaseIterable {
     var productId: String {
         switch self {
         case .weekly:
-            return "com.smssender.premium.weekly"
+            return "week"
         case .yearly:
-            return "com.smssender.premium.yearly"
+            return "year"
         }
     }
 }
@@ -46,11 +48,9 @@ struct SubscriptionProduct: Identifiable, Equatable {
     func savingsText(comparedTo weeklyProduct: SubscriptionProduct?) -> String? {
         guard isYearly, let weeklyProduct = weeklyProduct else { return nil }
         
-        // Calculate yearly equivalent of weekly price
         let weeklyYearlyEquivalent = weeklyProduct.priceValue * 52
         let savings = weeklyYearlyEquivalent - priceValue
         
-        // Convert Decimal to Double for percentage calculation
         let savingsDouble = NSDecimalNumber(decimal: savings).doubleValue
         let weeklyYearlyEquivalentDouble = NSDecimalNumber(decimal: weeklyYearlyEquivalent).doubleValue
         let savingsPercentage = Int((savingsDouble / weeklyYearlyEquivalentDouble) * 100)

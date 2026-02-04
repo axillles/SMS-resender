@@ -25,20 +25,17 @@ class SMSForwardingService {
     func forwardSMS(message: String, sender: String, timestamp: Date, subject: String? = nil) async {
         logger.info("📨 Received SMS forwarding request: sender=\(sender), message length=\(message.count)")
         
-        // 1. Проверяем наличие активной подписки
         await SubscriptionService.shared.checkSubscriptionStatus()
         if await !SubscriptionService.shared.hasActiveSubscription {
             logger.error("❌ Cannot forward: No active subscription")
             return
         }
         
-        // 2. Получаем registration_id
         guard let registrationId = StorageService.getRegistrationId() else {
             logger.error("❌ Cannot forward: Device not registered")
             return
         }
         
-        // 3. Получаем все правила пересылки
         let rules = StorageService.getForwardingRules()
         
         if rules.isEmpty {
@@ -46,24 +43,18 @@ class SMSForwardingService {
             return
         }
         
-        // 3. Фильтруем правила по расписанию (schedule feature)
-        // Schedule feature must be handled at the iOS App End
-        // Если у правила включено расписание, но текущее время не попадает в диапазон,
-        // правило считается неактивным и не используется для пересылки
+       
         let activeRules = filterRulesBySchedule(rules, currentTime: timestamp)
         
         if activeRules.isEmpty {
-            // Если все правила неактивны по расписанию (например, сейчас ночь, 
-            // а правила работают только днем), сообщение не отправляется на сервер
+            
             logger.info("ℹ️ No active rules match current schedule. Message will not be forwarded.")
             return
         }
         
         logger.info("✅ Found \(activeRules.count) active rule(s) for forwarding")
         
-        // 4. Отправляем на сервер
-        // Сервер сам обработает все активные правила и перешлет на все destinations
-        // (email, phone, slack, api) согласно настройкам пользователя
+        
         do {
             let response = try await networkService.forward(
                 registrationId: registrationId,
@@ -74,11 +65,9 @@ class SMSForwardingService {
             )
             
             if response.isSuccess {
-                // Отмечаем, что первое сообщение было отправлено
                 if !StorageService.hasForwardedFirstMessage() {
                     StorageService.setHasForwardedFirstMessage(true)
                     logger.info("🎉 First message forwarded successfully!")
-                    // Отправляем уведомление для обновления UI
                     NotificationCenter.default.post(name: .firstMessageForwarded, object: nil)
                 }
                 
@@ -96,11 +85,9 @@ class SMSForwardingService {
     }
     
     // MARK: - Schedule Filtering
-    /// Фильтрует правила по расписанию (schedule feature)
-    /// Schedule feature must be handled at the iOS App End
+
     private func filterRulesBySchedule(_ rules: [ForwardingRule], currentTime: Date) -> [ForwardingRule] {
         return rules.filter { rule in
-            // Если расписание не включено, правило всегда активно
             guard rule.isScheduleEnabled else {
                 return true
             }
@@ -109,21 +96,16 @@ class SMSForwardingService {
             let currentHour = calendar.component(.hour, from: currentTime)
             let currentMinute = calendar.component(.minute, from: currentTime)
             let currentDayOfWeek = calendar.component(.weekday, from: currentTime)
-            // Calendar.weekday: 1 = Sunday, 2 = Monday, ..., 7 = Saturday
-            // Наш selectedDays: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
             let dayIndex = (currentDayOfWeek == 1) ? 0 : currentDayOfWeek - 1
             
-            // Проверяем день недели
             guard rule.selectedDays.contains(dayIndex) else {
                 return false
             }
             
-            // Если весь день, правило активно
             if rule.isAllDay {
                 return true
             }
             
-            // Проверяем время
             guard let startTime = rule.startTime,
                   let endTime = rule.endTime else {
                 return true
@@ -138,12 +120,9 @@ class SMSForwardingService {
             let startMinutes = startHour * 60 + startMinute
             let endMinutes = endHour * 60 + endMinute
             
-            // Проверяем, попадает ли текущее время в диапазон
             if startMinutes <= endMinutes {
-                // Обычный случай: начало < конец (например, 9:00 - 17:00)
                 return currentMinutes >= startMinutes && currentMinutes <= endMinutes
             } else {
-                // Переход через полночь (например, 22:00 - 6:00)
                 return currentMinutes >= startMinutes || currentMinutes <= endMinutes
             }
         }

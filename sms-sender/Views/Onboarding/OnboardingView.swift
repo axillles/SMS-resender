@@ -9,16 +9,57 @@ import SwiftUI
 import AVKit
 import AVFoundation
 
+// MARK: - Video Preloader
+final class OnboardingVideoPreloader: ObservableObject {
+    private var players: [String: AVPlayer] = [:]
+    private let lock = NSLock()
+    
+    private static func videoKey(stepNumber: Int, allMessages: Bool) -> String {
+        if stepNumber == 3 {
+            return allMessages ? "step3_2" : "step3"
+        }
+        return "step\(stepNumber + 1)"
+    }
+    
+    func player(stepNumber: Int, allMessages: Bool) -> AVPlayer? {
+        lock.lock()
+        defer { lock.unlock() }
+        return players[Self.videoKey(stepNumber: stepNumber, allMessages: allMessages)]
+    }
+    
+    func preloadAll() {
+        let keys = ["step2", "step3", "step3_2", "step4", "step5", "step6", "step7"]
+        let extensions = ["mp4", "mov", "m4v", "MOV"]
+        for key in keys {
+            var url: URL?
+            for ext in extensions {
+                if let u = Bundle.main.url(forResource: key, withExtension: ext) {
+                    url = u
+                    break
+                }
+            }
+            guard let url else { continue }
+            let item = AVPlayerItem(asset: AVURLAsset(url: url))
+            let p = AVPlayer(playerItem: item)
+            p.actionAtItemEnd = .none
+            p.isMuted = true
+            lock.lock()
+            players[key] = p
+            lock.unlock()
+        }
+    }
+}
+
 struct OnboardingView: View {
     @Binding var isPresented: Bool
     @State private var currentPage = 0
+    @StateObject private var videoPreloader = OnboardingVideoPreloader()
     
     private let totalPages = 7
     private let isFirstTime: Bool
     
     init(isPresented: Binding<Bool>, isFirstTime: Bool? = nil) {
         self._isPresented = isPresented
-        // If not specified, determine based on whether onboarding was completed before
         self.isFirstTime = isFirstTime ?? !StorageService.hasCompletedOnboarding()
     }
     
@@ -34,6 +75,7 @@ struct OnboardingView: View {
                             OnboardingStepView(
                                 stepNumber: index,
                                 isLastStep: index == totalPages - 1,
+                                currentPage: $currentPage,
                                 onNext: {
                                     if index < totalPages - 1 {
                                         goToPage(index + 1)
@@ -42,9 +84,14 @@ struct OnboardingView: View {
                                     }
                                 }
                             )
+                            .environmentObject(videoPreloader)
                         )
                     }
                 )
+            }
+            .environmentObject(videoPreloader)
+            .onAppear {
+                videoPreloader.preloadAll()
             }
             .navigationTitle("Setup Guide")
             .navigationBarTitleDisplayMode(.inline)
@@ -66,7 +113,6 @@ struct OnboardingView: View {
     }
     
     private func goToPage(_ page: Int) {
-        // Используем DispatchQueue для гарантии, что анимация выполнится
         DispatchQueue.main.async {
             withAnimation(.easeInOut(duration: 0.35)) {
                 self.currentPage = page
@@ -80,7 +126,6 @@ struct OnboardingView: View {
         withAnimation {
             isPresented = false
         }
-        // Show paywall after onboarding if no active subscription
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             NotificationCenter.default.post(name: .showPaywall, object: nil)
         }
@@ -90,10 +135,16 @@ struct OnboardingView: View {
 struct OnboardingStepView: View {
     let stepNumber: Int
     let isLastStep: Bool
+    @Binding var currentPage: Int
     let onNext: () -> Void
     
+    @EnvironmentObject private var videoPreloader: OnboardingVideoPreloader
+    @Environment(\.scenePhase) private var scenePhase
+    
     @State private var player: AVPlayer?
-    @State private var observer: NSObjectProtocol?
+    @State private var loopObserver: NSObjectProtocol?
+    @State private var statusObservation: NSKeyValueObservation?
+    @State private var step3ChoiceAllMessages: Bool = false
     
     private var stepTitle: String {
         if stepNumber == 0 {
@@ -104,23 +155,24 @@ struct OnboardingStepView: View {
     }
     
     private var videoName: String {
+        if stepNumber == 3 {
+            return step3ChoiceAllMessages ? "step3_2" : "step3"
+        }
         return "step\(stepNumber + 1)"
     }
     
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Image/Video Section - Full size at top
                 if stepNumber == 0 {
-                    // First screen - show image
                     if let image = UIImage(named: "step1") {
                         Image(uiImage: image)
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxWidth: .infinity)
+                            .scaledToFit()
+                            .frame(height: geometry.size.height * 0.55)
+                            .clipped()
                             .background(Color.white)
                     } else {
-                        // Fallback if image not found
                         ZStack {
                             Color.white
                             Image(systemName: "photo")
@@ -131,41 +183,33 @@ struct OnboardingStepView: View {
                         .aspectRatio(16/9, contentMode: .fit)
                     }
                 } else {
-                    // Other screens - show video
                     if let player = player {
                         VideoPlayerView(player: player)
                             .frame(maxWidth: .infinity)
-                            .frame(height: min(450, geometry.size.height * 0.45))
-                            .clipped()
+                            .frame(height: geometry.size.height * 0.55)
+                            .edgesIgnoringSafeArea(.horizontal)
                             .background(Color.white)
-                            .onAppear {
-                                player.play()
-                            }
                             .onDisappear {
                                 player.pause()
                             }
                     } else {
-                        // Placeholder while video loads
                         ZStack {
                             Color.white
                             ProgressView()
                         }
-                        .frame(maxWidth: geometry.size.width)
-                        .frame(height: 300)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: geometry.size.height * 0.55)
                     }
                 }
                 
-                // Scrollable content section
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Step Title
                         Text(stepTitle)
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .padding(.top, 30)
+                            .padding(.top, 10)
                             .padding(.horizontal)
                         
-                        // Instructions
                         VStack(alignment: .leading, spacing: 16) {
                             instructionContent
                         }
@@ -175,9 +219,7 @@ struct OnboardingStepView: View {
                     }
                 }
                 
-                // Fixed bottom section
                 VStack(spacing: 0) {
-                    // Navigation Dots
                     HStack(spacing: 8) {
                         ForEach(0..<7, id: \.self) { index in
                             Circle()
@@ -187,75 +229,172 @@ struct OnboardingStepView: View {
                     }
                     .padding(.vertical, 20)
                     
-                    // Next/Done Button
                     Button(action: onNext) {
-                        Text(isLastStep ? "Done" : "Next")
+                        Text(isLastStep ? "Done" : "Continue")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.blue)
-                            .cornerRadius(12)
+                            .cornerRadius(26)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 30)
+                    
                 }
                 .background(Color(UIColor.systemGroupedBackground))
             }
         }
         .onAppear {
             if stepNumber != 0 {
-                setupVideo()
+                attachPreloadedPlayer()
             }
         }
         .onDisappear {
             cleanupVideo()
         }
+        .onChange(of: step3ChoiceAllMessages) { _, _ in
+            if stepNumber == 3 {
+                switchStep3Video()
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard stepNumber == currentPage else { return }
+            switch newPhase {
+            case .active:
+                player?.play()
+            case .inactive, .background:
+                player?.pause()
+            @unknown default:
+                break
+            }
+        }
     }
     
     private var instructionContent: some View {
         Group {
-            // This will be customized for each step
-            // For now, showing placeholder content
             switch stepNumber {
             case 0:
-                Text("Welcome! Let's set up your SMS forwarding automation.")
-                    .font(.body)
+                Text("Required to forward text messages.")
+                    .font(.title2)
+                    .fontWeight(.semibold)
                     .foregroundColor(.secondary)
+                Text("Forward SMS requires Shortcuts Automations to automatically receive and forward incoming messages.")
             case 1:
                 VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "Choose New Blank Automation.")
-                    instructionItem(number: 2, text: "Search for Forward SMS.")
-                    instructionItem(number: 3, text: "Select Forward Message from the list of actions.")
+                    instructionItem(
+                        number: 1,
+                        appIcon: Image("Shortcuts"), // asset с иконкой
+                        appName: "Shortcuts",
+                        url: URL(string: "shortcuts://")!
+                    )
+
+
+                    instructionItem(number: 2, text: "Go to the **Automation** tab.")
                 }
             case 2:
                 VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "Configure the automation settings.")
-                    instructionItem(number: 2, text: "Set up your forwarding destination.")
+                    instructionItem(number: 1, text: "Tap on **New Automation**.")
+                    instructionItem(number: 2, text: "Select **Mesage** from the list of triggers.")
                 }
             case 3:
-                VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "Enable the automation.")
-                    instructionItem(number: 2, text: "Test the connection.")
-                }
+                step3Content
             case 4:
                 VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "Verify your settings.")
-                    instructionItem(number: 2, text: "Confirm the setup.")
+                    instructionItem(number: 1, text: "Select **Run Immediately** to skip confirmation for each forward.")
                 }
             case 5:
                 VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "Choose New Blank Automation.")
-                    instructionItem(number: 2, text: "Search for Forward SMS.")
-                    instructionItem(number: 3, text: "Select Forward Message from the list of actions.")
+                    instructionItem(number: 1, text: "Choose **New Blank Automation**.")
+                    instructionItem(number: 2, text: "Search for **Forward SMS**.")
+                    instructionItem(number: 3, text: "Select **Forward Message** from the list of actions.")
                 }
             case 6:
                 VStack(alignment: .leading, spacing: 12) {
-                    instructionItem(number: 1, text: "You're all set!")
-                    instructionItem(number: 2, text: "Your SMS forwarding is now active.")
+                    instructionItem(number: 1, text: "Select the **Message** field.")
+                    instructionItem(number: 2, text: "**Scroll to theright** on the toolbar above the keyboard.")
+                    instructionItem(number: 3, text: "Set **Mesage** to .")
                 }
             default:
                 EmptyView()
+            }
+        }
+    }
+
+    private var step3Content: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 6) {
+                Text("What messages do you want to forward?")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                Image(systemName: "questionmark.circle")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    step3ChoiceAllMessages = false
+                } label: {
+                    Text("Specific Messages")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(step3ChoiceAllMessages ? .secondary : .primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(step3ChoiceAllMessages
+                                      ? Color(UIColor.tertiarySystemFill)
+                                      : Color(UIColor.secondarySystemGroupedBackground))
+                            )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(step3ChoiceAllMessages ? Color.clear : Color.blue, lineWidth: 2)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    step3ChoiceAllMessages = true
+                } label: {
+                    Text("All Messages")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(step3ChoiceAllMessages ? .primary : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(step3ChoiceAllMessages
+                                      ? Color(UIColor.secondarySystemGroupedBackground)
+                                      : Color(UIColor.tertiarySystemFill))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(step3ChoiceAllMessages ? Color.blue : Color.clear, lineWidth: 2)
+                        )
+                            )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if step3ChoiceAllMessages {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.title3)
+                        .foregroundColor(.yellow)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Forwarding All Messages")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text("Set the \"Message Contains\" condition to a single space (tap the space bar once) to forward all texts.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(UIColor.tertiarySystemGroupedBackground))
+                )
             }
         }
     }
@@ -269,7 +408,7 @@ struct OnboardingStepView: View {
                 .background(Color.blue)
                 .clipShape(Circle())
             
-            Text(text)
+            Text(.init(text))
                 .font(.body)
                 .foregroundColor(.primary)
             
@@ -277,47 +416,111 @@ struct OnboardingStepView: View {
         }
     }
     
-    private func setupVideo() {
-        // Try different video extensions
-        let extensions = ["mp4", "mov", "m4v"]
-        var videoURL: URL?
-        
-        for ext in extensions {
-            if let url = Bundle.main.url(forResource: videoName, withExtension: ext) {
-                videoURL = url
-                break
+    private func instructionItem(
+        number: Int,
+        appIcon: Image,
+        appName: String,
+        url: URL
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(number)")
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(Color.blue)
+                .clipShape(Circle())
+
+            HStack(spacing: 6) {
+                Text("Open")
+
+                appIcon
+                    .resizable()
+                    .frame(width: 18, height: 18)
+                    .cornerRadius(4)
+
+                Link(destination: url) {
+                    HStack(spacing: 4) {
+                        Text(appName)
+                            .fontWeight(.semibold)
+
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                    }
+                }
             }
+            
+            Spacer()
         }
-        
-        guard let url = videoURL else {
-            // If video file doesn't exist, show placeholder
-            print("Video file \(videoName) not found in bundle (tried: \(extensions.joined(separator: ", ")))")
+    }
+
+    
+    private func attachPreloadedPlayer() {
+        cleanupVideo()
+        guard let preloaded = videoPreloader.player(stepNumber: stepNumber, allMessages: step3ChoiceAllMessages) else {
             return
         }
-        
-        let newPlayer = AVPlayer(url: url)
-        newPlayer.actionAtItemEnd = .none
-        newPlayer.isMuted = true // Mute by default for better UX
-        
-        // Set up looping
-        let item = newPlayer.currentItem
-        observer = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak newPlayer] _ in
-            newPlayer?.seek(to: .zero)
-            newPlayer?.play()
+        attachPlayerAndStart(preloaded)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak preloaded] in
+            preloaded?.seek(to: .zero)
+            preloaded?.play()
         }
-        
-        self.player = newPlayer
+    }
+
+    private func switchStep3Video() {
+        removeObserversOnly()
+        guard let preloaded = videoPreloader.player(stepNumber: 3, allMessages: step3ChoiceAllMessages) else {
+            player = nil
+            return
+        }
+        attachPlayerAndStart(preloaded)
+    }
+
+    private func attachPlayerAndStart(_ preloaded: AVPlayer) {
+        let item = preloaded.currentItem
+        let startPlayback: () -> Void = { [weak preloaded] in
+            DispatchQueue.main.async {
+                preloaded?.seek(to: .zero)
+                preloaded?.play()
+            }
+        }
+        statusObservation = item?.observe(\.status, options: [.new]) { _, _ in
+            guard item?.status == .readyToPlay else { return }
+            startPlayback()
+        }
+        if item?.status == .readyToPlay {
+            startPlayback()
+        }
+        if let item {
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: item,
+                queue: .main
+            ) { [weak preloaded] _ in
+                preloaded?.seek(to: .zero)
+                preloaded?.play()
+            }
+        }
+        self.player = preloaded
+        startPlayback()
+    }
+
+    private func removeObserversOnly() {
+        player?.pause()
+        statusObservation?.invalidate()
+        statusObservation = nil
+        if let obs = loopObserver {
+            NotificationCenter.default.removeObserver(obs)
+            loopObserver = nil
+        }
     }
     
     private func cleanupVideo() {
         player?.pause()
-        if let observer = observer {
-            NotificationCenter.default.removeObserver(observer)
-            self.observer = nil
+        statusObservation?.invalidate()
+        statusObservation = nil
+        if let obs = loopObserver {
+            NotificationCenter.default.removeObserver(obs)
+            loopObserver = nil
         }
         player = nil
     }
@@ -332,7 +535,7 @@ struct VideoPlayerView: UIViewRepresentable {
         containerView.backgroundColor = .white
         
         let playerLayer = AVPlayerLayer(player: player)
-        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.videoGravity = .resizeAspect
         containerView.playerLayer = playerLayer
         containerView.layer.addSublayer(playerLayer)
         
@@ -387,7 +590,6 @@ struct PageViewController: UIViewControllerRepresentable {
         let currentViewController = context.coordinator.viewControllers[currentPage]
         let displayedViewController = pageViewController.viewControllers?.first
         
-        // Проверяем, что текущий контроллер не является уже отображаемым
         if displayedViewController !== currentViewController {
             let direction: UIPageViewController.NavigationDirection = 
                 currentPage > context.coordinator.currentPage ? .forward : .reverse

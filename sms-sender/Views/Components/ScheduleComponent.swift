@@ -15,7 +15,7 @@ struct ScheduleComponent: View {
     @Binding var selectedDays: Set<Int>
     
     private let daysOfWeek = ["M", "T", "W", "T", "F", "S", "S"]
-    private let dayIndices = [2, 3, 4, 5, 6, 7, 1] // Monday = 2, Sunday = 1 (Calendar standard)
+    private let dayIndices = [2, 3, 4, 5, 6, 7, 1]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -23,7 +23,6 @@ struct ScheduleComponent: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            // Enable Schedule Toggle
             HStack {
                 Text("Enable Schedule")
                     .font(.body)
@@ -33,7 +32,6 @@ struct ScheduleComponent: View {
             }
             
             if isScheduleEnabled {
-                // All Day Toggle
                 HStack {
                     Text("All Day")
                         .font(.body)
@@ -42,7 +40,6 @@ struct ScheduleComponent: View {
                         .labelsHidden()
                 }
                 
-                // Start Time
                 if !isAllDay {
                     HStack {
                         Text("Start Time")
@@ -52,7 +49,6 @@ struct ScheduleComponent: View {
                             .labelsHidden()
                     }
                     
-                    // End Time
                     HStack {
                         Text("End Time")
                             .font(.body)
@@ -62,7 +58,6 @@ struct ScheduleComponent: View {
                     }
                 }
                 
-                // Days of Week
                 HStack(spacing: 12) {
                     ForEach(0..<7) { index in
                         DayButton(

@@ -28,37 +28,29 @@ class RegistrationService {
     
     // MARK: - Registration Flow
     func registerIfNeeded() async throws {
-        // 1. Get or create UUID from Keychain
         let uuid = KeychainService.getOrCreateUUID()
         
-        // 2. Check if already registered
         if let registrationId = StorageService.getRegistrationId(), StorageService.isRegistered() {
-            // Already registered, no need to register again
             return
         }
         
-        // 3. Get device info
         let deviceDetails = getDeviceInfo()
         
-        // 4. Save device info to UserDefaults
         StorageService.saveDeviceInfo(
             name: deviceDetails.deviceName,
             iosVersion: deviceDetails.iosVersion,
             appVersion: deviceDetails.appVersion
         )
         
-        // 5. Register with backend
         let response = try await NetworkService.shared.register(
             uuid: uuid,
             deviceDetails: deviceDetails
         )
         
-        // 6. Check response
         guard response.isSuccess, let registrationId = response.registrationId else {
             throw RegistrationError.registrationFailed(message: response.message ?? "Unknown error")
         }
         
-        // 7. Save registration_id to UserDefaults
         StorageService.saveRegistrationId(registrationId)
         StorageService.setRegistered(true)
     }

@@ -32,6 +32,17 @@ struct ForwardingRule: Identifiable, Codable {
         self.selectedDays = selectedDays
     }
     
+    init(id: UUID, type: DestinationType, destination: String, isScheduleEnabled: Bool = false, isAllDay: Bool = true, startTime: Date? = nil, endTime: Date? = nil, selectedDays: Set<Int> = []) {
+        self.id = id
+        self.type = type
+        self.destination = destination
+        self.isScheduleEnabled = isScheduleEnabled
+        self.isAllDay = isAllDay
+        self.startTime = startTime
+        self.endTime = endTime
+        self.selectedDays = selectedDays
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)

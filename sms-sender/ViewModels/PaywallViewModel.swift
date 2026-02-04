@@ -20,7 +20,6 @@ class PaywallViewModel: ObservableObject {
     private var storeProducts: [Product] = []
     
     init() {
-        // Set default selected product to yearly (better value)
         Task {
             await loadProducts()
         }
@@ -34,10 +33,9 @@ class PaywallViewModel: ObservableObject {
             let productIds = SubscriptionPeriod.allCases.map { $0.productId }
             storeProducts = try await Product.products(for: productIds)
             
-            // Если продукты не найдены (еще не настроены в App Store Connect), используем fallback
             if storeProducts.isEmpty {
                 print("⚠️ Products not found in App Store Connect. Using fallback prices.")
-                print("💡 После настройки продуктов в App Store Connect цены будут загружаться автоматически.")
+                print("💡 After setting up products in App Store Connect, prices will load automatically.")
                 products = createFallbackProducts()
                 selectedProduct = products.first(where: { $0.isYearly }) ?? products.first
                 isLoading = false
@@ -58,7 +56,6 @@ class PaywallViewModel: ObservableObject {
                     product: product
                 )
             }.sorted { first, second in
-                // Sort: yearly first, then weekly
                 if first.isYearly && !second.isYearly {
                     return true
                 } else if !first.isYearly && second.isYearly {
@@ -67,7 +64,6 @@ class PaywallViewModel: ObservableObject {
                 return false
             }
             
-            // Set default selection to yearly if available
             if let yearlyProduct = products.first(where: { $0.isYearly }) {
                 selectedProduct = yearlyProduct
             } else if let firstProduct = products.first {
@@ -78,9 +74,8 @@ class PaywallViewModel: ObservableObject {
             
         } catch {
             print("❌ Error loading products: \(error)")
-            print("💡 Используются fallback цены. После настройки продуктов в App Store Connect цены будут загружаться автоматически.")
+            print("💡 Using fallback prices. After setting up products in App Store Connect, prices will load automatically.")
             
-            // Fallback to hardcoded prices if StoreKit fails
             products = createFallbackProducts()
             selectedProduct = products.first(where: { $0.isYearly }) ?? products.first
         }
@@ -88,10 +83,17 @@ class PaywallViewModel: ObservableObject {
         isLoading = false
     }
     
+    var isConfigured: Bool {
+        products.contains { $0.product != nil }
+    }
+
     func purchase() async -> Bool {
-        guard let selectedProduct = selectedProduct,
-              let product = selectedProduct.product else {
-            errorMessage = "Please select a subscription plan"
+        guard let selectedProduct = selectedProduct else {
+            errorMessage = "Please select a subscription plan (Weekly or Yearly)."
+            return false
+        }
+        guard let product = selectedProduct.product else {
+            errorMessage = "Subscriptions are not set up yet. In App Store Connect, create In-App Purchases with Product ID: \(selectedProduct.id). See SubscriptionProduct.swift for details."
             return false
         }
         
@@ -105,10 +107,8 @@ class PaywallViewModel: ObservableObject {
             case .success(let verification):
                 switch verification {
                 case .verified(let transaction):
-                    // Transaction is verified, complete it
                     await transaction.finish()
                     
-                    // Update subscription status (проверит и StoreKit, и API)
                     await SubscriptionService.shared.refreshSubscriptionStatus()
                     
                     purchaseInProgress = false
@@ -143,7 +143,6 @@ class PaywallViewModel: ObservableObject {
         
         do {
             try await AppStore.sync()
-            // Check current entitlements
             for await result in Transaction.currentEntitlements {
                 switch result {
                 case .verified(let transaction):

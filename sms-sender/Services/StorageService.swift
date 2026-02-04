@@ -97,7 +97,6 @@ class StorageService {
     }
     
     static func hasCompletedOnboarding() -> Bool {
-        // Check if key exists - if not, it's first launch
         if userDefaults.object(forKey: Keys.hasCompletedOnboarding) == nil {
             return false
         }

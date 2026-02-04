@@ -10,6 +10,9 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @Environment(\.dismiss) var dismiss
+    @State private var showPaywall = false
+    @State private var isRestoring = false
+    @State private var restoreResult: RestoreResult?
 
     var body: some View {
         NavigationStack {
@@ -38,16 +41,69 @@ struct SettingsView: View {
             .navigationDestination(item: $viewModel.selectedAction) { action in
                 destinationView(for: action)
             }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView(isPresented: $showPaywall)
+            }
+            .overlay {
+                if isRestoring {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView("Restoring…")
+                        .padding(20)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .disabled(isRestoring)
             .onChange(of: viewModel.selectedAction) { oldValue, newValue in
-                if newValue == .showOnboarding || newValue == .subscription {
-                    // Post notification to show onboarding
+                guard let newValue else { return }
+                switch newValue {
+                case .subscription:
+                    showPaywall = true
+                    viewModel.selectedAction = nil
+                case .restore:
+                    viewModel.selectedAction = nil
+                    runRestorePurchases()
+                case .showOnboarding:
                     NotificationCenter.default.post(name: .showOnboarding, object: nil)
-                    // Reset selection after a moment
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         viewModel.selectedAction = nil
                     }
+                default:
+                    break
                 }
             }
+            .alert("Restore Purchase", isPresented: Binding(
+                get: { restoreResult != nil },
+                set: { if !$0 { restoreResult = nil } }
+            )) {
+                Button("OK", role: .cancel) {
+                    restoreResult = nil
+                }
+            } message: {
+                if let result = restoreResult {
+                    Text(restoreMessage(for: result))
+                }
+            }
+        }
+    }
+
+    private func runRestorePurchases() {
+        isRestoring = true
+        Task { @MainActor in
+            let result = await SubscriptionService.shared.restorePurchases()
+            isRestoring = false
+            restoreResult = result
+        }
+    }
+
+    private func restoreMessage(for result: RestoreResult) -> String {
+        switch result {
+        case .success:
+            return "Your subscription has been restored."
+        case .noPurchasesFound:
+            return "No previous purchases found for this Apple ID."
+        case .failure(let error):
+            return "Restore failed: \(error.localizedDescription)"
         }
     }
 
@@ -84,14 +140,12 @@ struct SettingsView: View {
     private func destinationView(for action: SettingsAction) -> some View {
         switch action {
         case .subscription:
-            // This case is handled in onChange, but we need it for the switch
             EmptyView()
 
         case .restore:
-            Text("Restore Purchase")
+            EmptyView()
             
         case .showOnboarding:
-            // This case is handled in onChange, but we need it for the switch
             EmptyView()
 
         case .privacy:
@@ -107,7 +161,6 @@ struct SettingsView: View {
             Text("Contact Us")
             
         case .setup:
-            // This case is no longer used, but kept for compatibility
             EmptyView()
         }
     }

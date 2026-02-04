@@ -14,9 +14,8 @@ class SetupRuleViewModel: ObservableObject {
     @Published var isAllDay: Bool = true
     @Published var startTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     @Published var endTime: Date = Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date()) ?? Date()
-    @Published var selectedDays: Set<Int> = [2, 3, 4, 5, 6] // Monday to Friday
+    @Published var selectedDays: Set<Int> = [2, 3, 4, 5, 6]
     
-    // Phone specific
     @Published var selectedCountryCode: CountryCode = CountryCode.popularCodes[0]
     @Published var phoneNumber: String = ""
     @Published var showOTPAlert = false
@@ -31,6 +30,28 @@ class SetupRuleViewModel: ObservableObject {
     @Published var testSuccess = false
     
     private let networkService = NetworkService.shared
+    
+    // MARK: - Load Existing Rule
+    func loadRule(_ rule: ForwardingRule) {
+        if rule.type == .phone {
+            let fullNumber = rule.destination
+            for countryCode in CountryCode.allCodes {
+                if fullNumber.hasPrefix(countryCode.code) {
+                    selectedCountryCode = countryCode
+                    phoneNumber = String(fullNumber.dropFirst(countryCode.code.count))
+                    break
+                }
+            }
+        } else {
+            destination = rule.destination
+        }
+        
+        isScheduleEnabled = rule.isScheduleEnabled
+        isAllDay = rule.isAllDay
+        startTime = rule.startTime ?? Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+        endTime = rule.endTime ?? Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date()) ?? Date()
+        selectedDays = rule.selectedDays
+    }
     
     func createRule(type: DestinationType) -> ForwardingRule {
         let finalDestination: String
@@ -125,10 +146,8 @@ class SetupRuleViewModel: ObservableObject {
                 phoneNumber: fullPhoneNumber
             )
             
-            // If server returns OTP in response (for development/testing), auto-fill it
             if let serverOTP = response.otpCode {
                 otpCode = serverOTP
-                // Still show alert, but with pre-filled OTP
             }
             
             showOTPAlert = true
@@ -234,7 +253,6 @@ class SetupRuleViewModel: ObservableObject {
         testSuccess = false
         
         let type = destinationType == .slack ? "webhook" : "webhook"
-        // Note: API uses is_slack flag to distinguish
         
         do {
             _ = try await networkService.testConnection(

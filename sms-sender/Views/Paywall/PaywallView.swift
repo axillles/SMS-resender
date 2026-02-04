@@ -29,8 +29,6 @@ struct PaywallView: View {
     }
     
     private func handlePurchaseSuccess() {
-        // Update subscription status after successful purchase
-        // Это проверит и StoreKit транзакции, и API статус
         Task {
             await SubscriptionService.shared.refreshSubscriptionStatus()
         }
@@ -40,7 +38,6 @@ struct PaywallView: View {
     
     var body: some View {
         ZStack {
-            // Dark gradient background
             LinearGradient(
                 colors: [
                     Color(red: 0.1, green: 0.05, blue: 0.2),
@@ -59,37 +56,36 @@ struct PaywallView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Top bar with Skip button
                         topBar
                             .padding(.top, 10)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         
-                        // Premium badge
                         premiumBadge
                             .padding(.bottom, 30)
                         
-                        // Title
                         titleSection
                             .padding(.bottom, 40)
                         
-                        // Feature icons in triangle
                         featureIconsSection
                             .padding(.bottom, 20)
                         
-                        // Subscription Options
                         if !viewModel.products.isEmpty {
                             subscriptionOptionsSection
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 30)
                         }
+
+                        if !viewModel.isConfigured && !viewModel.products.isEmpty {
+                            setupHintBanner
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 16)
+                        }
                         
-                        // CTA Button
                         ctaButton
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         
-                        // Footer
                         footerSection
                             .padding(.bottom, 30)
                     }
@@ -151,31 +147,27 @@ struct PaywallView: View {
     
     private var featureIconsSection: some View {
         ZStack {
-            // Triangle layout for icons
             VStack(spacing: 0) {
-                // Top icon (green - phone with arrows)
-                // Можно использовать системную иконку или кастомное изображение
-                // Для кастомного: добавьте изображение в Assets.xcassets (например, "phone-icon") или используйте имя файла "phone-icon.png"
                 FeatureIconView(
-                    icon: "arrow.triangle.2.circlepath.phone.fill", // Системная иконка SF Symbols
+                    icon: "Phone",
+                    isSystemIcon: false,
                     color: .green,
-                    size: 60
+                    size: 100
                 )
                 .offset(y: -30)
                 
                 HStack(spacing: 80) {
-                    // Left icon (red - envelope)
                     FeatureIconView(
-                        icon: "envelope.fill", // Системная иконка SF Symbols
+                        icon: "Gmail",
+                        isSystemIcon: false,
                         color: .red,
                         size: 60
                     )
                     .offset(x: -20)
                     
-                    // Right icon (teal - custom image)
-                    // Пример использования кастомного изображения: "slack.webp" или "slack" (если в Assets)
                     FeatureIconView(
-                        icon: "slack.png", // Кастомное изображение (должно быть в Assets или bundle)
+                        icon: "Slack",
+                        isSystemIcon: false,
                         color: .cyan,
                         size: 60
                     )
@@ -203,6 +195,26 @@ struct PaywallView: View {
         }
     }
     
+    // MARK: - Setup hint (subscriptions not configured)
+    private var setupHintBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.yellow)
+                Text("Subscriptions not loaded from App Store")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+            }
+            Text("In App Store Connect, add subscriptions with Product ID: week and year. Fill in metadata (localization, price, duration) for each — then they will appear here.")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.12))
+        .cornerRadius(12)
+    }
+
     // MARK: - CTA Button
     
     private var ctaButton: some View {
@@ -220,7 +232,7 @@ struct PaywallView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
                 } else {
-                    Text("Start 7-day free trial")
+                    Text(viewModel.isConfigured ? "Start 7-day free trial" : "Subscriptions not configured")
                         .font(.system(size: 17, weight: .semibold))
                 }
             }
@@ -239,8 +251,8 @@ struct PaywallView: View {
             )
             .cornerRadius(14)
         }
-        .disabled(viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty)
-        .opacity((viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty) ? 0.6 : 1.0)
+        .disabled(viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty || !viewModel.isConfigured)
+        .opacity((viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty || !viewModel.isConfigured) ? 0.6 : 1.0)
     }
     
     // MARK: - Footer Section
@@ -248,7 +260,6 @@ struct PaywallView: View {
     private var footerSection: some View {
         VStack(spacing: 16) {
             Button(action: {
-                // Handle referral code
             }) {
                 Text("Have a referral code?")
                     .font(.system(size: 14))
@@ -266,7 +277,6 @@ struct PaywallView: View {
             }
             
             Button(action: {
-                // Open Terms & Conditions
                 if let url = URL(string: "https://yourwebsite.com/terms") {
                     UIApplication.shared.open(url)
                 }
@@ -283,40 +293,31 @@ struct PaywallView: View {
 
 struct FeatureIconView: View {
     let icon: String
+    let isSystemIcon: Bool
     let color: Color
     let size: CGFloat
     
-    // Проверяем, является ли иконка системной (SF Symbol) или кастомным изображением
-    private var isSystemIcon: Bool {
-        // Если иконка содержит точку (например, "slack.webp"), это кастомное изображение
-        return !icon.contains(".")
-    }
-    
     var body: some View {
         ZStack {
-            // Glow effect
             Circle()
                 .fill(color.opacity(0.2))
                 .frame(width: size + 20, height: size + 20)
                 .blur(radius: 15)
             
-            // Icon circle
             Circle()
                 .fill(color.opacity(0.15))
                 .frame(width: size, height: size)
             
             if isSystemIcon {
-                // Системная иконка SF Symbols
                 Image(systemName: icon)
                     .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundColor(color)
             } else {
-                // Кастомное изображение (например, slack.webp)
                 Image(icon)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: size * 0.5, height: size * 0.5)
-                    .foregroundColor(color)
+                    .clipShape(Circle())
             }
         }
     }
@@ -332,7 +333,6 @@ struct SubscriptionOptionView: View {
     
     private var monthlyPrice: String {
         if product.isYearly {
-            // For yearly, show price per month (divide by 12)
             let monthly = product.priceValue / 12
             let formatter = NumberFormatter()
             formatter.numberStyle = .currency
@@ -340,7 +340,6 @@ struct SubscriptionOptionView: View {
             formatter.maximumFractionDigits = 2
             return formatter.string(from: monthly as NSDecimalNumber) ?? "$0.00"
         } else {
-            // For weekly, show price per month (multiply by 4.33)
             let monthly = product.priceValue * 4.33
             let formatter = NumberFormatter()
             formatter.numberStyle = .currency
@@ -358,7 +357,6 @@ struct SubscriptionOptionView: View {
         let total = formatter.string(from: product.priceValue as NSDecimalNumber) ?? "$0.00"
         
         if product.isYearly {
-            // For yearly, show as "quarterly" to match design (though it's actually yearly)
             return "\(total) billed quarterly"
         } else {
             return "\(total) billed monthly"
@@ -366,7 +364,6 @@ struct SubscriptionOptionView: View {
     }
     
     private var periodDisplayName: String {
-        // Show "Quarterly" for yearly to match design
         if product.isYearly {
             return "Quarterly"
         } else {
@@ -405,7 +402,6 @@ struct SubscriptionOptionView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 
-                // Savings badge
                 if let savings = savingsAmount, product.isYearly {
                     Text("\(savings) OFF")
                         .font(.system(size: 10, weight: .bold))

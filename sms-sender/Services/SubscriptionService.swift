@@ -23,27 +23,22 @@ class SubscriptionService: ObservableObject {
         }
     }
     
-    /// Проверяет статус подписки из StoreKit и API
     func checkSubscriptionStatus() async {
         isLoading = true
         
         var hasActive = false
         
-        // 1. Проверяем StoreKit (локальные транзакции)
         do {
             for await result in Transaction.currentEntitlements {
                 switch result {
                 case .verified(let transaction):
-                    // Check if transaction is for our subscription products
                     if transaction.productID.contains("premium") {
-                        // Check if subscription is still active
                         if let expirationDate = transaction.expirationDate {
                             if expirationDate > Date() {
                                 hasActive = true
                                 break
                             }
                         } else {
-                            // Non-consumable or subscription without expiration
                             hasActive = true
                             break
                         }
@@ -56,13 +51,11 @@ class SubscriptionService: ObservableObject {
             print("Error checking StoreKit transactions: \(error)")
         }
         
-        // 2. Проверяем API (источник истины - сервер)
         if let registrationId = StorageService.getRegistrationId() {
             do {
                 let profileResponse = try await networkService.getProfile(registrationId: registrationId)
                 
                 if let profile = profileResponse.profile {
-                    // API статус имеет приоритет
                     let apiStatus = profile.subscription.isActive
                     hasActive = apiStatus
                     
@@ -70,7 +63,6 @@ class SubscriptionService: ObservableObject {
                 }
             } catch {
                 print("⚠️ Failed to check subscription status from API: \(error)")
-                // Если API недоступен, используем StoreKit статус
             }
         }
         
@@ -80,13 +72,27 @@ class SubscriptionService: ObservableObject {
         isLoading = false
     }
     
-    /// Быстрая проверка статуса подписки (синхронная, из кеша)
     var hasActiveSubscriptionSync: Bool {
         return StorageService.hasActiveSubscription()
     }
     
-    /// Обновляет статус подписки (асинхронно)
     func refreshSubscriptionStatus() async {
         await checkSubscriptionStatus()
     }
+
+    func restorePurchases() async -> RestoreResult {
+        do {
+            try await AppStore.sync()
+            await checkSubscriptionStatus()
+            return hasActiveSubscription ? .success : .noPurchasesFound
+        } catch {
+            return .failure(error)
+        }
+    }
+}
+
+enum RestoreResult {
+    case success
+    case noPurchasesFound
+    case failure(Error)
 }
