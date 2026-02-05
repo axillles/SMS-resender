@@ -76,12 +76,6 @@ struct PaywallView: View {
                                 .padding(.bottom, 30)
                         }
 
-                        if !viewModel.isConfigured && !viewModel.products.isEmpty {
-                            setupHintBanner
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 16)
-                        }
-                        
                         ctaButton
                             .padding(.horizontal, 20)
                             .padding(.bottom, 20)
@@ -195,26 +189,6 @@ struct PaywallView: View {
         }
     }
     
-    // MARK: - Setup hint (subscriptions not configured)
-    private var setupHintBanner: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                    .foregroundColor(.yellow)
-                Text("Subscriptions not loaded from App Store")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
-            }
-            Text("In App Store Connect, add subscriptions with Product ID: week and year. Fill in metadata (localization, price, duration) for each — then they will appear here.")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.85))
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.12))
-        .cornerRadius(12)
-    }
-
     // MARK: - CTA Button
     
     private var ctaButton: some View {
@@ -232,7 +206,7 @@ struct PaywallView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
                 } else {
-                    Text(viewModel.isConfigured ? "Start 7-day free trial" : "Subscriptions not configured")
+                    Text("Start 7-day free trial")
                         .font(.system(size: 17, weight: .semibold))
                 }
             }
@@ -251,8 +225,8 @@ struct PaywallView: View {
             )
             .cornerRadius(14)
         }
-        .disabled(viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty || !viewModel.isConfigured)
-        .opacity((viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty || !viewModel.isConfigured) ? 0.6 : 1.0)
+        .disabled(viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty)
+        .opacity((viewModel.purchaseInProgress || viewModel.isLoading || viewModel.products.isEmpty) ? 0.6 : 1.0)
     }
     
     // MARK: - Footer Section
@@ -331,44 +305,34 @@ struct SubscriptionOptionView: View {
     let isSelected: Bool
     let onTap: () -> Void
     
-    private var monthlyPrice: String {
+    /// USD formatter for per-week and savings (always $).
+    private static var usdFormatter: NumberFormatter {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = Locale(identifier: "en_US")
+        f.currencyCode = "USD"
+        f.maximumFractionDigits = 2
+        return f
+    }
+    
+    /// Price per week (yearly ÷ 52), always in $.
+    private var pricePerWeekLine: String {
         if product.isYearly {
-            let monthly = product.priceValue / 12
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-            formatter.maximumFractionDigits = 2
-            return formatter.string(from: monthly as NSDecimalNumber) ?? "$0.00"
+            let perWeek = product.priceValue / 52
+            let formatted = Self.usdFormatter.string(from: perWeek as NSDecimalNumber) ?? "$0.00"
+            return "\(formatted) / week"
         } else {
-            let monthly = product.priceValue * 4.33
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .currency
-            formatter.currencyCode = "USD"
-            formatter.maximumFractionDigits = 2
-            return formatter.string(from: monthly as NSDecimalNumber) ?? "$0.00"
+            return product.displayPrice
         }
     }
     
-    private var totalBilled: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = 2
-        let total = formatter.string(from: product.priceValue as NSDecimalNumber) ?? "$0.00"
-        
-        if product.isYearly {
-            return "\(total) billed quarterly"
-        } else {
-            return "\(total) billed monthly"
-        }
+    /// Billing period line: "billed weekly" / "billed yearly".
+    private var billingPeriod: String {
+        product.isYearly ? "billed yearly" : "billed weekly"
     }
     
     private var periodDisplayName: String {
-        if product.isYearly {
-            return "Quarterly"
-        } else {
-            return "Monthly"
-        }
+        product.period.displayName
     }
     
     private var savingsAmount: String? {
@@ -376,11 +340,7 @@ struct SubscriptionOptionView: View {
         let weeklyYearlyEquivalent = weeklyProduct.priceValue * 52
         let savings = weeklyYearlyEquivalent - product.priceValue
         guard savings > 0 else { return nil }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: savings as NSDecimalNumber)
+        return Self.usdFormatter.string(from: savings as NSDecimalNumber)
     }
     
     var body: some View {
@@ -391,11 +351,11 @@ struct SubscriptionOptionView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                     
-                    Text("\(monthlyPrice) / month")
+                    Text(pricePerWeekLine)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                     
-                    Text(totalBilled)
+                    Text("\(product.displayPrice) \(billingPeriod)")
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.6))
                 }

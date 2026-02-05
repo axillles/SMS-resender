@@ -32,7 +32,8 @@ class SubscriptionService: ObservableObject {
             for await result in Transaction.currentEntitlements {
                 switch result {
                 case .verified(let transaction):
-                    if transaction.productID.contains("premium") {
+                    let isOurSubscription = SubscriptionPeriod.allCases.contains { $0.productId == transaction.productID }
+                    if isOurSubscription {
                         if let expirationDate = transaction.expirationDate {
                             if expirationDate > Date() {
                                 hasActive = true
