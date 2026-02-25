@@ -8,11 +8,17 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Binding var isPresented: Bool
     @StateObject private var viewModel = SettingsViewModel()
-    @Environment(\.dismiss) var dismiss
     @State private var showPaywall = false
     @State private var isRestoring = false
     @State private var restoreResult: RestoreResult?
+    @State private var showDeleteAccountConfirmation = false
+    @State private var isDeletingAccount = false
+
+    init(isPresented: Binding<Bool> = .constant(false)) {
+        _isPresented = isPresented
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,6 +44,13 @@ struct SettingsView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        isPresented = false
+                    }
+                }
+            }
             .navigationDestination(item: $viewModel.selectedAction) { action in
                 destinationView(for: action)
             }
@@ -68,6 +81,15 @@ struct SettingsView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         viewModel.selectedAction = nil
                     }
+                case .privacy:
+                    UIApplication.shared.open(AppURLs.privacyPolicy)
+                    viewModel.selectedAction = nil
+                case .terms:
+                    UIApplication.shared.open(AppURLs.termsAndConditions)
+                    viewModel.selectedAction = nil
+                case .contact:
+                    UIApplication.shared.open(AppURLs.contact)
+                    viewModel.selectedAction = nil
                 default:
                     break
                 }
@@ -84,7 +106,37 @@ struct SettingsView: View {
                     Text(restoreMessage(for: result))
                 }
             }
+            .alert("Delete Account", isPresented: $showDeleteAccountConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    showDeleteAccountConfirmation = false
+                }
+                Button("Delete", role: .destructive) {
+                    performDeleteAccount()
+                }
+            } message: {
+                Text("All your data will be removed from this device. You can register again later. This cannot be undone.")
+            }
+            .overlay {
+                if isDeletingAccount {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView("Deleting…")
+                        .padding(20)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .disabled(isDeletingAccount)
         }
+    }
+
+    private func performDeleteAccount() {
+        showDeleteAccountConfirmation = false
+        isDeletingAccount = true
+        StorageService.clearAll()
+        _ = KeychainService.deleteUUID()
+        isDeletingAccount = false
+        isPresented = false
+        NotificationCenter.default.post(name: .showOnboarding, object: nil)
     }
 
     private func runRestorePurchases() {
@@ -124,7 +176,11 @@ struct SettingsView: View {
             VStack(spacing: 1) {
                 ForEach(rows) { row in
                     Button {
-                        viewModel.selectedAction = row.action
+                        if row.action == .deleteAccount {
+                            showDeleteAccountConfirmation = true
+                        } else {
+                            viewModel.selectedAction = row.action
+                        }
                     } label: {
                         SettingsRowView(row: row)
                     }
@@ -149,16 +205,16 @@ struct SettingsView: View {
             EmptyView()
 
         case .privacy:
-            Text("Privacy Policy")
+            EmptyView()
 
         case .terms:
-            Text("Terms of Use")
+            EmptyView()
 
         case .deleteAccount:
             Text("Delete Account")
 
         case .contact:
-            Text("Contact Us")
+            EmptyView()
             
         case .setup:
             EmptyView()

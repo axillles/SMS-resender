@@ -75,18 +75,8 @@ struct DestinationPicker: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView(isPresented: $showPaywall)
         }
-        .onChange(of: showPaywall) { oldValue, newValue in
-            if oldValue == true && newValue == false {
-                Task {
-                    await subscriptionService.checkSubscriptionStatus()
-                    if subscriptionService.hasActiveSubscription, let pendingDestination = selectedDestination {
-                    }
-                }
-            }
-        }
-        .task {
-            await subscriptionService.checkSubscriptionStatus()
-        }
+        // Не вызываем checkSubscriptionStatus() при открытии — это запрашивает вход в Apple ID.
+        // Используем кэш (проверка была при запуске приложения; после покупки статус обновляет PaywallViewModel).
     }
     
     private func handleDestinationSelection(_ destination: DestinationType) {
@@ -110,21 +100,21 @@ struct DestinationButton: View {
             VStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 40, weight: .medium))
-                    .foregroundColor(.black)
-                
+                    .foregroundColor(Color.primary)
+
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(.black)
+                    .foregroundColor(Color.primary)
             }
             .frame(width: 150, height: 150)
-            .background(Color.white)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.black, lineWidth: 1)
+                    .stroke(Color(UIColor.separator), lineWidth: 1)
             )
+        }
     }
-}
 }
 
 #Preview {

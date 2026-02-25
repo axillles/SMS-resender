@@ -47,8 +47,7 @@ struct ContentView: View {
             }
         }
         .task {
-            await subscriptionService.checkSubscriptionStatus()
-            
+            // Не вызываем checkSubscriptionStatus() при появлении экрана — запрашивает Apple ID.
             if !subscriptionService.hasActiveSubscription &&
                !StorageService.hasShownPaywallOnLaunch() &&
                !showOnboarding {

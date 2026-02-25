@@ -25,11 +25,7 @@ struct sms_senderApp: App {
                         await registrationViewModel.register()
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                    Task {
-                        await SubscriptionService.shared.checkSubscriptionStatus()
-                    }
-                }
+                // Не проверяем подписку при возврате в приложение — запрашивает вход в Apple ID
         }
     }
 }

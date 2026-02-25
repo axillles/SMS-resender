@@ -232,13 +232,7 @@ struct PaywallView: View {
     // MARK: - Footer Section
     
     private var footerSection: some View {
-        VStack(spacing: 16) {
-            Button(action: {
-            }) {
-                Text("Have a referral code?")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.8))
-            }
+        HStack(spacing: 16) {
             
             Button(action: {
                 Task {
@@ -251,9 +245,7 @@ struct PaywallView: View {
             }
             
             Button(action: {
-                if let url = URL(string: "https://yourwebsite.com/terms") {
-                    UIApplication.shared.open(url)
-                }
+                UIApplication.shared.open(AppURLs.termsAndConditions)
             }) {
                 Text("Terms & Conditions")
                     .font(.system(size: 14))

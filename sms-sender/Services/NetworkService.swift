@@ -315,8 +315,8 @@ class NetworkService {
     }
     
     // MARK: - Forward Message
-    func forward(registrationId: String, message: String, sender: String, timestamp: Date, subject: String? = nil) async throws -> ForwardResponse {
-        logger.info("📨 Forwarding message from: \(sender)")
+    func forward(registrationId: String, message: String, sender: String, timestamp: Date, subject: String? = nil, targets: [ForwardTarget]? = nil) async throws -> ForwardResponse {
+        logger.info("📨 Forwarding message from: \(sender) to \(APIConstants.baseURL)\(APIConstants.forward)")
         guard let url = APIConstants.forwardURL else {
             logger.error("❌ Invalid forward URL")
             throw NetworkError.invalidURL
@@ -327,7 +327,8 @@ class NetworkService {
             message: message,
             sender: sender,
             timestamp: timestamp,
-            subject: subject
+            subject: subject,
+            targets: targets
         )
         
         let response = try await performRequest(

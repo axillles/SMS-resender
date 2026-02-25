@@ -76,7 +76,7 @@ struct ScheduleComponent: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
     }
 }
@@ -86,18 +86,18 @@ struct DayButton: View {
     let dayIndex: Int
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text(day)
                 .font(.headline)
-                .foregroundColor(isSelected ? .white : .black)
+                .foregroundColor(isSelected ? Color(UIColor.systemBackground) : Color.primary)
                 .frame(width: 40, height: 40)
-                .background(isSelected ? Color.black : Color.white)
+                .background(isSelected ? Color.primary : Color(UIColor.tertiarySystemFill))
                 .clipShape(Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.black, lineWidth: 1)
+                        .stroke(Color(UIColor.separator), lineWidth: 1)
                 )
         }
     }

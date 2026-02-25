@@ -38,11 +38,11 @@ struct SetupRuleView: View {
                             TextField(getPlaceholderText(), text: $viewModel.destination)
                                 .textFieldStyle(.plain)
                                 .padding()
-                                .background(Color.white)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                        .stroke(Color(UIColor.separator), lineWidth: 1)
                                 )
                                 .autocapitalization(.none)
                                 .keyboardType(.emailAddress)
@@ -51,49 +51,17 @@ struct SetupRuleView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
-                            HStack(spacing: 12) {
-                                Menu {
-                                    ForEach(CountryCode.allCodes) { countryCode in
-                                        Button(action: {
-                                            viewModel.selectedCountryCode = countryCode
-                                        }) {
-                                            HStack {
-                                                Text(countryCode.displayName)
-                                                if viewModel.selectedCountryCode.code == countryCode.code {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    HStack {
-                                        Text(viewModel.selectedCountryCode.displayName)
-                                            .foregroundColor(.primary)
-                                        Image(systemName: "chevron.down")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.white)
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.black.opacity(0.1), lineWidth: 1)
-                                    )
-                                }
-                            }
-                            
-                            TextField("5551234567", text: $viewModel.phoneNumber)
+                            TextField("+15551234567", text: $viewModel.phoneNumber)
                                 .textFieldStyle(.plain)
                                 .padding()
-                                .background(Color.white)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                        .stroke(Color(UIColor.separator), lineWidth: 1)
                                 )
                                 .keyboardType(.phonePad)
+                                .autocapitalization(.none)
                         } else {
                             Text(destinationType.rawValue.uppercased())
                                 .font(.headline)
@@ -102,11 +70,11 @@ struct SetupRuleView: View {
                             TextField(getPlaceholderText(), text: $viewModel.destination)
                                 .textFieldStyle(.plain)
                                 .padding()
-                                .background(Color.white)
+                                .background(Color(UIColor.secondarySystemGroupedBackground))
                                 .cornerRadius(8)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                                        .stroke(Color(UIColor.separator), lineWidth: 1)
                                 )
                                 .autocapitalization(.none)
                                 .keyboardType(.default)
@@ -195,11 +163,11 @@ struct SetupRuleView: View {
                             Text("Save")
                                 .font(.headline)
                         }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.black)
-                        .cornerRadius(12)
+                            .foregroundColor(Color(UIColor.systemBackground))
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.primary)
+                            .cornerRadius(12)
                     }
                     .disabled(viewModel.isSaving)
                     .padding(.horizontal)

@@ -16,7 +16,6 @@ class SetupRuleViewModel: ObservableObject {
     @Published var endTime: Date = Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date()) ?? Date()
     @Published var selectedDays: Set<Int> = [2, 3, 4, 5, 6]
     
-    @Published var selectedCountryCode: CountryCode = CountryCode.popularCodes[0]
     @Published var phoneNumber: String = ""
     @Published var showOTPAlert = false
     @Published var otpCode: String = ""
@@ -34,14 +33,7 @@ class SetupRuleViewModel: ObservableObject {
     // MARK: - Load Existing Rule
     func loadRule(_ rule: ForwardingRule) {
         if rule.type == .phone {
-            let fullNumber = rule.destination
-            for countryCode in CountryCode.allCodes {
-                if fullNumber.hasPrefix(countryCode.code) {
-                    selectedCountryCode = countryCode
-                    phoneNumber = String(fullNumber.dropFirst(countryCode.code.count))
-                    break
-                }
-            }
+            phoneNumber = rule.destination
         } else {
             destination = rule.destination
         }
@@ -56,7 +48,7 @@ class SetupRuleViewModel: ObservableObject {
     func createRule(type: DestinationType) -> ForwardingRule {
         let finalDestination: String
         if type == .phone {
-            finalDestination = selectedCountryCode.code + phoneNumber
+            finalDestination = phoneNumber
         } else {
             finalDestination = destination
         }
@@ -72,9 +64,9 @@ class SetupRuleViewModel: ObservableObject {
         )
     }
     
-    // MARK: - Phone Number
+    // MARK: - Phone Number (full number with country code, entered by user)
     var fullPhoneNumber: String {
-        return selectedCountryCode.code + phoneNumber
+        return phoneNumber
     }
     
     // MARK: - Save Email
@@ -141,15 +133,11 @@ class SetupRuleViewModel: ObservableObject {
         otpError = nil
         
         do {
-            let response = try await networkService.requestOTP(
+            _ = try await networkService.requestOTP(
                 registrationId: registrationId,
                 phoneNumber: fullPhoneNumber
             )
-            
-            if let serverOTP = response.otpCode {
-                otpCode = serverOTP
-            }
-            
+            otpCode = ""
             showOTPAlert = true
         } catch {
             otpError = error.localizedDescription

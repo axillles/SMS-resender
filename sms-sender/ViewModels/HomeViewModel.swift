@@ -112,4 +112,44 @@ class HomeViewModel: ObservableObject {
         StorageService.saveForwardingRules(rules)
         logger.info("✅ Rule updated successfully")
     }
+
+    // MARK: - Delete Rule
+    func deleteRule(at offsets: IndexSet) {
+        let toRemove = offsets.map { rules[$0] }
+        rules.remove(atOffsets: offsets)
+        StorageService.saveForwardingRules(rules)
+        for rule in toRemove {
+            Task { await deleteRuleOnServer(rule) }
+        }
+        logger.info("✅ Rule(s) deleted locally")
+    }
+
+    private func deleteRuleOnServer(_ rule: ForwardingRule) async {
+        guard let registrationId = StorageService.getRegistrationId() else { return }
+        do {
+            switch rule.type {
+            case .email:
+                _ = try await NetworkService.shared.saveEmail(
+                    registrationId: registrationId,
+                    emailAddress: rule.destination,
+                    delete: true
+                )
+            case .phone:
+                _ = try await NetworkService.shared.deletePhone(
+                    registrationId: registrationId,
+                    phoneNumber: rule.destination
+                )
+            case .slack, .api:
+                _ = try await NetworkService.shared.saveURL(
+                    registrationId: registrationId,
+                    url: rule.destination,
+                    isSlack: rule.type == .slack,
+                    delete: true
+                )
+            }
+            logger.info("✅ Deleted \(rule.type.rawValue) on server")
+        } catch {
+            logger.error("❌ Failed to delete on server: \(error.localizedDescription)")
+        }
+    }
 }

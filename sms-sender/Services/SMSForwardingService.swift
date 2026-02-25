@@ -25,8 +25,7 @@ class SMSForwardingService {
     func forwardSMS(message: String, sender: String, timestamp: Date, subject: String? = nil) async {
         logger.info("📨 Received SMS forwarding request: sender=\(sender), message length=\(message.count)")
         
-        await SubscriptionService.shared.checkSubscriptionStatus()
-        if await !SubscriptionService.shared.hasActiveSubscription {
+        guard await SubscriptionService.shared.hasActiveSubscriptionSync else {
             logger.error("❌ Cannot forward: No active subscription")
             return
         }
@@ -54,6 +53,7 @@ class SMSForwardingService {
         
         logger.info("✅ Found \(activeRules.count) active rule(s) for forwarding")
         
+        let targets = activeRules.map { ForwardTarget(type: $0.type.rawValue, destination: $0.destination) }
         
         do {
             let response = try await networkService.forward(
@@ -61,7 +61,8 @@ class SMSForwardingService {
                 message: message,
                 sender: sender,
                 timestamp: timestamp,
-                subject: subject
+                subject: subject,
+                targets: targets.isEmpty ? nil : targets
             )
             
             if response.isSuccess {

@@ -8,7 +8,15 @@
 import Foundation
 
 struct APIConstants {
-    static let baseURL = "https://www.autoforwardtext.com/api"
+    /// В Debug при переменной окружения USE_MOCK_BACKEND=1 используется локальный мок (запусти Scripts/mock_forward_server.py).
+    static var baseURL: String {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["USE_MOCK_BACKEND"] == "1" {
+            return "http://127.0.0.1:8080/api"
+        }
+        #endif
+        return "https://www.autoforwardtext.com/api"
+    }
     
     // MARK: - Endpoints
     static let register = "/aft_register.php"

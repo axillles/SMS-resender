@@ -59,8 +59,8 @@ struct HomeView: View {
              .navigationDestination(isPresented: $showDestinationPicker) {
                  DestinationPicker(homeViewModel: viewModel)
              }
-             .navigationDestination(isPresented: $showSettings){
-                 SettingsView()
+             .sheet(isPresented: $showSettings) {
+                 SettingsView(isPresented: $showSettings)
              }
              .sheet(item: $editingRule) { rule in
                  NavigationStack {
@@ -115,16 +115,23 @@ struct HomeView: View {
     }
     
     private var rulesStateView: some View {
-        ScrollView{
-            VStack(spacing: 12){
-                ForEach(viewModel.rules) { rule in
-                    RuleRow(rule: rule) {
-                        editingRule = rule
-                    }
+        List {
+            ForEach(viewModel.rules) { rule in
+                RuleRow(rule: rule) {
+                    editingRule = rule
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(UIColor.secondarySystemGroupedBackground))
+                        .padding(.horizontal, 4)
+                )
             }
-            .padding()
+            .onDelete(perform: viewModel.deleteRule)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 }
 

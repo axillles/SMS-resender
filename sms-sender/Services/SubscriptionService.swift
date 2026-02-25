@@ -18,11 +18,12 @@ class SubscriptionService: ObservableObject {
     private let networkService = NetworkService.shared
     
     private init() {
-        Task {
-            await checkSubscriptionStatus()
-        }
+        hasActiveSubscription = StorageService.hasActiveSubscription()
+        // Не вызываем checkSubscriptionStatus() при старте — это запрашивает вход в Apple ID.
+        // Полная проверка только при Restore и после покупки.
     }
     
+    /// Проверка по локальным транзакциям и API. Без AppStore.sync() — он вызывает плашку входа в Apple ID.
     func checkSubscriptionStatus() async {
         isLoading = true
         
@@ -58,7 +59,9 @@ class SubscriptionService: ObservableObject {
                 
                 if let profile = profileResponse.profile {
                     let apiStatus = profile.subscription.isActive
-                    hasActive = apiStatus
+                    // Не перезаписываем StoreKit: если подписка активна по чекам — считаем активной.
+                    // API может отставать (серверные нотификации), в TestFlight это часто так.
+                    hasActive = hasActive || apiStatus
                     
                     print("📊 Subscription status from API: \(profile.subscription.status) (product_id: \(profile.subscription.productId))")
                 }
